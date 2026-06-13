@@ -26,7 +26,7 @@ function poDivIcon(count: number, isReference: boolean): L.DivIcon {
   const ring = isReference ? '#67e8f9' : count > 0 ? '#6ee7b7' : '#a1a1aa';
   const label = isReference ? '★' : count > 0 ? String(count) : '·';
   return L.divIcon({
-    className: 'insultrack-po-pin',
+    className: 'insultrac-po-pin',
     html: `<div style="
       background:${bg};
       width:36px;height:36px;border-radius:50%;

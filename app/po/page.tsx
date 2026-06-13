@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import type {
@@ -24,6 +24,7 @@ import {
   ACTION_LABEL,
 } from '@/lib/util';
 import { applyDelivery } from '@/lib/inventory';
+import { api, getToken, setToken, ApiError } from '@/lib/api';
 
 type TabId =
   | 'inventory'
@@ -68,13 +69,37 @@ function PODetailInner() {
   const searchParams = useSearchParams();
   const decoded = searchParams.get('n') ?? '';
 
-  const [currentUser] = usePersistedState<User | null>('insultrack-currentUser', null);
-  const [pos, setPOs] = usePersistedState<POJob[]>('insultrack-pos', seedPOs);
-  const [inventory, setInventory] = usePersistedState<InventoryItem[]>('insultrack-inventory', seedInventory);
-  const [transactions, setTransactions] = usePersistedState<Transaction[]>('insultrack-transactions', seedTransactions);
-  const [transfers] = usePersistedState<Transfer[]>('insultrack-transfers', []);
-  const [reports] = usePersistedState<DailyReport[]>('insultrack-reports', []);
-  const [orders] = usePersistedState<MaterialOrder[]>('insultrack-orders', []);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const token = getToken();
+      if (!token) {
+        if (!cancelled) setAuthChecked(true);
+        return;
+      }
+      try {
+        const r = await api.me();
+        if (!cancelled) {
+          setCurrentUser(r.user);
+          setAuthChecked(true);
+        }
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) setToken(null);
+        if (!cancelled) setAuthChecked(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const [pos, setPOs] = usePersistedState<POJob[]>('insultrac-pos', seedPOs);
+  const [inventory, setInventory] = usePersistedState<InventoryItem[]>('insultrac-inventory', seedInventory);
+  const [transactions, setTransactions] = usePersistedState<Transaction[]>('insultrac-transactions', seedTransactions);
+  const [transfers] = usePersistedState<Transfer[]>('insultrac-transfers', []);
+  const [reports] = usePersistedState<DailyReport[]>('insultrac-reports', []);
+  const [orders] = usePersistedState<MaterialOrder[]>('insultrac-orders', []);
 
   const [activeTab, setActiveTab] = useState<TabId>('inventory');
   const [notesDraft, setNotesDraft] = useState<string | null>(null);
@@ -91,6 +116,14 @@ function PODetailInner() {
   const poOrders = orders.filter(o => o.poNumber === decoded);
   const poTransactions = transactions.filter(t => t.poNumber === decoded).slice(0, 30);
   const photos = po?.photos ?? [];
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+        <div className="text-zinc-500 text-sm">Loading…</div>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return (

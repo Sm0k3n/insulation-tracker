@@ -101,6 +101,8 @@ export default function Inventory({ inventory, setInventory, pos, currentUser, a
     <div>
       <div className="mb-4 flex justify-between items-start gap-3">
         <div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/inventory.jpg" alt="" className="h-16 w-auto object-contain mb-2" />
           <h1 className="text-2xl font-semibold">Inventory</h1>
           <p className="text-sm text-zinc-400">
             {isForeman && currentUser.assignedPO

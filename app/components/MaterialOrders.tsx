@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type {
   InventoryItem,
@@ -14,6 +14,7 @@ import { MATERIAL_CATEGORIES } from '@/lib/types';
 import { newId, makeTransaction, relativeTime } from '@/lib/util';
 import { STATUS_TONE, transitionOrder, fulfillDelivery } from '@/lib/orders';
 import { downloadCSV, todayStamp, toCSV } from '@/lib/csv';
+import { api } from '@/lib/api';
 
 interface MaterialOrdersProps {
   orders: MaterialOrder[];
@@ -47,6 +48,20 @@ export default function MaterialOrders({
   const isAdmin = currentUser.role === 'Admin';
   const isForeman = currentUser.role === 'Foreman';
   const isDriver = currentUser.role === 'Delivery Driver';
+
+  // Admins need the driver roster for the scheduling editor.
+  const [drivers, setDrivers] = useState<User[]>([]);
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      try {
+        const r = await api.listUsers();
+        setDrivers(r.users.filter(u => u.role === 'Delivery Driver'));
+      } catch {
+        // ignore — fallback is empty list
+      }
+    })();
+  }, [isAdmin]);
 
   const activePOs = useMemo(() => pos.filter(p => p.status !== 'Completed'), [pos]);
   const defaultPO =
@@ -157,6 +172,8 @@ export default function MaterialOrders({
     <div className="space-y-4">
       <div className="flex justify-between items-start gap-3">
         <div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/orders.jpg" alt="" className="h-16 w-auto object-contain mb-2" />
           <h1 className="text-2xl font-semibold">Material Orders</h1>
           <p className="text-sm text-zinc-400">
             {isDriver ? 'Available + your assigned runs' : 'Request, approve, dispatch'}
@@ -374,7 +391,28 @@ export default function MaterialOrders({
             key={o.id}
             order={o}
             currentUser={currentUser}
+            drivers={drivers}
             onAdvance={next => advanceOrder(o, next)}
+            onSchedule={patch =>
+              setOrders(prev =>
+                prev.map(x => {
+                  if (x.id !== o.id) return x;
+                  // If admin assigns a driver while still pre-Scheduled, bump status forward
+                  // so the driver actually sees it in their Deliveries view.
+                  const shouldPromote =
+                    patch.driverId &&
+                    (x.status === 'Submitted' || x.status === 'Approved');
+                  if (!shouldPromote) return { ...x, ...patch };
+                  const now = new Date().toISOString();
+                  const history = [...(x.history || [])];
+                  if (x.status === 'Submitted') {
+                    history.push({ status: 'Approved', by: currentUser.name, at: now });
+                  }
+                  history.push({ status: 'Scheduled', by: currentUser.name, at: now });
+                  return { ...x, ...patch, status: 'Scheduled', history };
+                }),
+              )
+            }
           />
         ))}
         {visible.length === 0 && (
@@ -397,6 +435,8 @@ function nextActions(order: MaterialOrder, user: User): OrderStatus[] {
     actions.push('Cancelled');
   }
   if (role === 'Delivery Driver') {
+    // Pre-assigned drivers can Accept their own runs even after admin scheduling.
+    if (order.status === 'Scheduled' && order.driverId === user.id) actions.push('Accepted by Driver');
     if (order.status === 'Scheduled' && !order.driverId) actions.push('Accepted by Driver');
     if (order.driverId === user.id) {
       if (order.status === 'Accepted by Driver') actions.push('Loaded');
@@ -411,16 +451,51 @@ function nextActions(order: MaterialOrder, user: User): OrderStatus[] {
   return actions;
 }
 
+interface SchedulePatch {
+  driverId?: string;
+  driverName?: string;
+  neededByDate?: string;
+  neededByTime?: string;
+  eta?: string;
+}
+
 function OrderCard({
   order,
   currentUser,
+  drivers,
   onAdvance,
+  onSchedule,
 }: {
   order: MaterialOrder;
   currentUser: User;
+  drivers: User[];
   onAdvance: (next: OrderStatus) => void;
+  onSchedule: (patch: SchedulePatch) => void;
 }) {
   const actions = nextActions(order, currentUser);
+  const isAdmin = currentUser.role === 'Admin';
+  const editable = isAdmin && !['Delivered', 'Cancelled'].includes(order.status);
+
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    driverId: order.driverId || '',
+    neededByDate: order.neededByDate,
+    neededByTime: order.neededByTime || '',
+    eta: order.eta ? order.eta.slice(0, 16) : '', // datetime-local format
+  });
+
+  const applyEdits = () => {
+    const driver = drivers.find(d => d.id === draft.driverId);
+    onSchedule({
+      driverId: draft.driverId || undefined,
+      driverName: driver?.name || (draft.driverId ? order.driverName : undefined),
+      neededByDate: draft.neededByDate,
+      neededByTime: draft.neededByTime || undefined,
+      eta: draft.eta ? new Date(draft.eta).toISOString() : undefined,
+    });
+    setEditing(false);
+  };
+
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
       <div className="flex justify-between items-start gap-3 mb-2">
@@ -449,6 +524,11 @@ function OrderCard({
             {order.neededByTime ? ` · ${order.neededByTime}` : ''}
             {' · req by '}{order.requestedBy}
           </div>
+          {order.eta && (
+            <div className="text-xs mt-1 text-emerald-300">
+              ⏱️ Driver ETA {new Date(order.eta).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+            </div>
+          )}
         </div>
         <div className="text-[10px] text-zinc-500 shrink-0 text-right">
           {relativeTime(order.createdAt)}
@@ -473,7 +553,86 @@ function OrderCard({
       )}
       {order.notes && <div className="text-xs text-amber-300 mt-2">{order.notes}</div>}
 
-      {actions.length > 0 && (
+      {editing && (
+        <div className="mt-4 pt-4 border-t border-zinc-800 space-y-3">
+          <div className="text-xs uppercase tracking-wider text-zinc-500">Schedule / reassign</div>
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500">Driver</label>
+            <select
+              value={draft.driverId}
+              onChange={e => setDraft({ ...draft, driverId: e.target.value })}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 mt-1 text-sm"
+            >
+              <option value="">— Unassigned (any driver can accept) —</option>
+              {drivers.map(d => (
+                <option key={d.id} value={d.id}>{d.name}{d.phone ? ` · ${d.phone}` : ''}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500">Needed by date</label>
+              <input
+                type="date"
+                value={draft.neededByDate}
+                onChange={e => setDraft({ ...draft, neededByDate: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 mt-1 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-zinc-500">Needed by time</label>
+              <input
+                type="time"
+                value={draft.neededByTime}
+                onChange={e => setDraft({ ...draft, neededByTime: e.target.value })}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 mt-1 text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {([
+              ['Today', 0],
+              ['Tomorrow', 1],
+              ['+3 days', 3],
+              ['Next week', 7],
+            ] as const).map(([label, offset]) => {
+              const d = new Date();
+              d.setDate(d.getDate() + offset);
+              const iso = d.toISOString().slice(0, 10);
+              const active = draft.neededByDate === iso;
+              return (
+                <button
+                  key={label}
+                  onClick={() => setDraft({ ...draft, neededByDate: iso })}
+                  className={`px-3 py-1 rounded-full text-[11px] border ${
+                    active
+                      ? 'bg-emerald-600 border-emerald-500 text-white'
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-800'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div>
+            <label className="text-[10px] uppercase tracking-wider text-zinc-500">Initial ETA (optional)</label>
+            <input
+              type="datetime-local"
+              value={draft.eta}
+              onChange={e => setDraft({ ...draft, eta: e.target.value })}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 mt-1 text-sm"
+            />
+            <div className="text-[10px] text-zinc-500 mt-1">The driver can update this later when they hit the road.</div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={applyEdits} className="flex-1 bg-emerald-600 hover:bg-emerald-700 py-2.5 rounded-xl text-sm">Save</button>
+            <button onClick={() => setEditing(false)} className="flex-1 bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-xl text-sm">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {(actions.length > 0 || editable) && !editing && (
         <div className="flex gap-2 flex-wrap mt-4 pt-4 border-t border-zinc-800">
           {actions.map(a => (
             <button
@@ -490,6 +649,14 @@ function OrderCard({
               → {a}
             </button>
           ))}
+          {editable && (
+            <button
+              onClick={() => setEditing(true)}
+              className="px-3.5 py-1.5 rounded-full text-xs font-medium bg-cyan-950 hover:bg-cyan-900 text-cyan-200 border border-cyan-800"
+            >
+              📅 Schedule / Reassign
+            </button>
+          )}
         </div>
       )}
     </div>

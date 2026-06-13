@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import BottomNav from './components/BottomNav';
 import POJobs from './components/POJobs';
 import Inventory from './components/Inventory';
@@ -13,11 +13,13 @@ import Dashboard from './components/Dashboard';
 import Deliveries from './components/Deliveries';
 import TransactionHistory from './components/TransactionHistory';
 import Notifications from './components/Notifications';
+import AuthScreen from './components/AuthScreen';
 
 import type { InventoryItem, MaterialOrder, POJob, Transaction, User } from '@/lib/types';
-import { seedInventory, seedPOs, seedUsers, seedTransactions } from '@/lib/seed';
+import { seedInventory, seedPOs, seedTransactions } from '@/lib/seed';
 import { usePersistedState } from '@/lib/persistence';
 import { makeTransaction, normalizeInventoryItem } from '@/lib/util';
+import { api, getToken, setToken, ApiError } from '@/lib/api';
 
 export type Tab =
   | 'dashboard'
@@ -31,82 +33,89 @@ export type Tab =
   | 'admin'
   | 'history';
 
-export default function InsulTrackApp() {
-  const [currentUser, setCurrentUser] = usePersistedState<User | null>('insultrack-currentUser', null);
-  const [users, setUsers] = usePersistedState<User[]>('insultrack-users', seedUsers);
-  const [pos, setPOs] = usePersistedState<POJob[]>('insultrack-pos', seedPOs);
-  const [inventory, setInventory] = usePersistedState<InventoryItem[]>('insultrack-inventory', seedInventory);
-  const [transactions, setTransactions] = usePersistedState<Transaction[]>('insultrack-transactions', seedTransactions);
-  const [orders, setOrders] = usePersistedState<MaterialOrder[]>('insultrack-orders', []);
+type AuthState =
+  | { kind: 'loading' }
+  | { kind: 'setup' }
+  | { kind: 'login' }
+  | { kind: 'authed'; user: User };
+
+export default function InsulTracApp() {
+  const [auth, setAuth] = useState<AuthState>({ kind: 'loading' });
+
+  const [pos, setPOs] = usePersistedState<POJob[]>('insultrac-pos', seedPOs);
+  const [inventory, setInventory] = usePersistedState<InventoryItem[]>('insultrac-inventory', seedInventory);
+  const [transactions, setTransactions] = usePersistedState<Transaction[]>('insultrac-transactions', seedTransactions);
+  const [orders, setOrders] = usePersistedState<MaterialOrder[]>('insultrac-orders', []);
 
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
 
-  // One-shot migration: backfill any pre-Session-1 inventory item that lacks
-  // `specs`, `category`, etc. so old localStorage data doesn't crash the UI.
+  // Inventory shape migration (carries over from earlier sessions).
   useEffect(() => {
     const broken = inventory.some(i => !i.specs || !i.category || !i.updatedAt || !i.updatedBy);
     if (!broken) return;
     setInventory(prev => prev.map(normalizeInventoryItem));
   }, [inventory, setInventory]);
 
+  // Boot: check session token → /me, else decide setup vs login.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const token = getToken();
+      if (token) {
+        try {
+          const r = await api.me();
+          if (!cancelled) setAuth({ kind: 'authed', user: r.user });
+          return;
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 401) setToken(null);
+        }
+      }
+      try {
+        const r = await api.setupNeeded();
+        if (!cancelled) setAuth({ kind: r.needed ? 'setup' : 'login' });
+      } catch {
+        if (!cancelled) setAuth({ kind: 'login' });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const onAuthed = useCallback((user: User) => {
+    setAuth({ kind: 'authed', user });
+    if (user.role === 'Foreman') setActiveTab('jobs');
+    else if (user.role === 'Delivery Driver') setActiveTab('deliveries');
+    else setActiveTab('dashboard');
+  }, []);
+
   const addTransaction = (tx: Parameters<typeof makeTransaction>[0]) => {
     setTransactions(prev => [makeTransaction(tx), ...prev].slice(0, 1000));
   };
 
-  const handleLogin = (user: User) => {
-    setCurrentUser(user);
-    if (user.role === 'Foreman') setActiveTab('jobs');
-    else if (user.role === 'Delivery Driver') setActiveTab('deliveries');
-    else if (user.role === 'Admin') setActiveTab('dashboard');
-    else setActiveTab('map');
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch {
+      // ignore — we clear locally either way
+    }
+    setToken(null);
+    setAuth({ kind: 'login' });
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-  };
-
-  if (!currentUser) {
+  if (auth.kind === 'loading') {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-semibold tracking-tighter">InsulTrack</h1>
-            <p className="text-zinc-500 mt-2">Mechanical Insulation Field Operations</p>
-          </div>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
-            <div className="text-sm text-zinc-400 mb-4 text-center">Select your account to continue</div>
-
-            <div className="space-y-2">
-              {users.map(user => (
-                <button
-                  key={user.id}
-                  onClick={() => handleLogin(user)}
-                  className="w-full flex justify-between items-center bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-2xl px-5 py-4 text-left transition-colors"
-                >
-                  <div>
-                    <div className="font-medium">{user.name}</div>
-                    <div className="text-xs text-zinc-500">
-                      {user.role}
-                      {user.assignedPO && ` · ${user.assignedPO}`}
-                    </div>
-                  </div>
-                  <div className="text-emerald-400 text-sm">Login →</div>
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-6 text-center text-xs text-zinc-500">
-              Admin can add accounts in Admin tab (log in as Taylor Kim)
-            </div>
-          </div>
-        </div>
+      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+        <div className="text-zinc-500 text-sm">Loading…</div>
       </div>
     );
   }
 
-  const isAdmin = currentUser.role === 'Admin';
-  const isDriver = currentUser.role === 'Delivery Driver';
+  if (auth.kind === 'setup' || auth.kind === 'login') {
+    return <AuthScreen mode={auth.kind} onAuthed={onAuthed} />;
+  }
+
+  const currentUser = auth.user;
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -157,7 +166,7 @@ export default function InsulTrackApp() {
       case 'reports':
         return <DailyReports inventory={inventory} setInventory={setInventory} pos={pos} currentUser={currentUser} addTransaction={addTransaction} />;
       case 'admin':
-        return <AdminPanel users={users} setUsers={setUsers} pos={pos} setPOs={setPOs} currentUser={currentUser} onOpenHistory={() => setActiveTab('history')} />;
+        return <AdminPanel pos={pos} setPOs={setPOs} currentUser={currentUser} onOpenHistory={() => setActiveTab('history')} />;
       case 'history':
         return <TransactionHistory transactions={transactions} pos={pos} />;
       default:
@@ -169,8 +178,13 @@ export default function InsulTrackApp() {
     <div className="min-h-screen bg-zinc-950 text-white pb-16">
       <div className="sticky top-0 z-40 bg-zinc-950 border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">InsulTrack</h1>
-          <p className="text-xs text-zinc-500">Mechanical Insulation · Field Ops</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/insultrac-logo.png"
+            alt="InsulTrac"
+            className="h-20 w-auto invert"
+          />
+          <p className="text-[10px] text-zinc-500 mt-1">Mechanical Insulation · Field Ops</p>
         </div>
 
         <div className="flex items-center gap-3 text-sm">

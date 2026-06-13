@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { POJob, User } from '@/lib/types';
+import { api } from '@/lib/api';
 
 const PO_STATUSES: POJob['status'][] = ['Active', 'On Hold', 'Completed'];
 
 interface AdminPanelProps {
-  users: User[];
-  setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   pos: POJob[];
   setPOs: React.Dispatch<React.SetStateAction<POJob[]>>;
   currentUser: User;
@@ -16,49 +15,113 @@ interface AdminPanelProps {
 
 const ROLES: User['role'][] = ['Employee', 'Foreman', 'Delivery Driver', 'Admin'];
 
-export default function AdminPanel({ users, setUsers, pos, setPOs, currentUser, onOpenHistory }: AdminPanelProps) {
+export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: AdminPanelProps) {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [usersError, setUsersError] = useState<string | null>(null);
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showUserForm, setShowUserForm] = useState(false);
-  const [form, setForm] = useState<{ name: string; role: User['role']; email: string; phone: string; assignedPO: string }>({
-    name: '', role: 'Employee', email: '', phone: '', assignedPO: '',
+  const [form, setForm] = useState<{ name: string; role: User['role']; email: string; password: string; phone: string; assignedPO: string }>({
+    name: '', role: 'Employee', email: '', password: '', phone: '', assignedPO: '',
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [showPOForm, setShowPOForm] = useState(false);
   const [poForm, setPOForm] = useState({ poNumber: '', address: '', contactName: '', contactPhone: '', latitude: '51.04', longitude: '-114.06', notes: '' });
 
+  const loadUsers = async () => {
+    setLoadingUsers(true);
+    setUsersError(null);
+    try {
+      const r = await api.listUsers();
+      setUsers(r.users);
+    } catch (e: any) {
+      setUsersError(e?.message || 'Failed to load users.');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => { loadUsers(); }, []);
+
   const openCreateUser = () => {
     setEditingId(null);
-    setForm({ name: '', role: 'Employee', email: '', phone: '', assignedPO: '' });
+    setForm({ name: '', role: 'Employee', email: '', password: '', phone: '', assignedPO: '' });
+    setFormError(null);
     setShowUserForm(true);
   };
 
   const openEditUser = (u: User) => {
     setEditingId(u.id);
-    setForm({ name: u.name, role: u.role, email: u.email, phone: u.phone, assignedPO: u.assignedPO || '' });
+    setForm({
+      name: u.name,
+      role: u.role,
+      email: u.email,
+      password: '',
+      phone: u.phone || '',
+      assignedPO: u.assignedPO || '',
+    });
+    setFormError(null);
     setShowUserForm(true);
   };
 
-  const saveUser = () => {
-    if (!form.name || !form.email) return;
-    const payload = {
-      name: form.name,
-      role: form.role,
-      email: form.email,
-      phone: form.phone,
-      assignedPO: form.role === 'Foreman' ? form.assignedPO || undefined : undefined,
-    };
-    if (editingId) {
-      setUsers(users.map(u => (u.id === editingId ? { ...u, ...payload } : u)));
-    } else {
-      setUsers([...users, { id: Date.now().toString(), ...payload }]);
+  const saveUser = async () => {
+    setFormError(null);
+    if (!form.name || !form.email) {
+      setFormError('Name and email are required.');
+      return;
     }
-    setEditingId(null);
-    setShowUserForm(false);
+    if (!editingId && form.password.length < 8) {
+      setFormError('Password must be at least 8 characters.');
+      return;
+    }
+    if (editingId && form.password && form.password.length < 8) {
+      setFormError('New password must be at least 8 characters.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (editingId) {
+        const body: any = {
+          name: form.name,
+          email: form.email,
+          role: form.role,
+          phone: form.phone || null,
+          assignedPO: form.role === 'Foreman' ? (form.assignedPO || null) : null,
+        };
+        if (form.password) body.password = form.password;
+        await api.updateUser(editingId, body);
+      } else {
+        await api.createUser({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          role: form.role,
+          phone: form.phone || null,
+          assignedPO: form.role === 'Foreman' ? (form.assignedPO || null) : null,
+        });
+      }
+      await loadUsers();
+      setShowUserForm(false);
+      setEditingId(null);
+    } catch (e: any) {
+      setFormError(e?.message || 'Failed to save user.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const deleteUser = (id: string) => {
+  const deleteUser = async (id: string) => {
     if (id === currentUser.id) return;
-    setUsers(users.filter(u => u.id !== id));
+    if (!window.confirm('Delete this user? They will not be able to sign in anymore.')) return;
+    try {
+      await api.deleteUser(id);
+      await loadUsers();
+    } catch (e: any) {
+      setUsersError(e?.message || 'Failed to delete user.');
+    }
   };
 
   const changePOStatus = (id: string, status: POJob['status']) => {
@@ -100,16 +163,17 @@ export default function AdminPanel({ users, setUsers, pos, setPOs, currentUser, 
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icons/admin.jpg" alt="" className="h-16 w-auto object-contain mb-2" />
           <div className="text-xl font-semibold">Admin</div>
           <div className="text-sm text-zinc-500">Manage users, PO jobs, and audit history</div>
         </div>
         <button onClick={onOpenHistory} className="text-sm text-emerald-400">View transaction history →</button>
       </div>
 
-      {/* USERS */}
       <section>
         <div className="flex justify-between items-center mb-3">
-          <div className="font-semibold">Users</div>
+          <div className="font-semibold">Users {users.length > 0 && <span className="text-xs text-zinc-500 ml-1">({users.length})</span>}</div>
           <button onClick={openCreateUser} className="px-3 py-1.5 bg-emerald-600 rounded-xl text-xs">+ New User</button>
         </div>
 
@@ -122,10 +186,16 @@ export default function AdminPanel({ users, setUsers, pos, setPOs, currentUser, 
                 className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm">
                 {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
-              <input placeholder="Phone" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
+              <input placeholder="Phone (optional)" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
                 className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
             </div>
-            <input placeholder="Email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
+            <input placeholder="Email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
+            <input
+              placeholder={editingId ? 'New password (leave blank to keep current)' : 'Password (8+ characters)'}
+              type="password"
+              value={form.password}
+              onChange={e => setForm({ ...form, password: e.target.value })}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
 
             {form.role === 'Foreman' && (
@@ -136,9 +206,19 @@ export default function AdminPanel({ users, setUsers, pos, setPOs, currentUser, 
               </select>
             )}
 
+            {formError && (
+              <div className="text-xs text-rose-400 bg-rose-950/40 border border-rose-900 rounded-xl px-3 py-2">
+                {formError}
+              </div>
+            )}
+
             <div className="flex gap-3 pt-2">
-              <button onClick={saveUser} className="flex-1 py-3 bg-white text-black rounded-xl font-medium text-sm">
-                {editingId ? 'Save Changes' : 'Create User'}
+              <button
+                onClick={saveUser}
+                disabled={submitting}
+                className="flex-1 py-3 bg-white text-black rounded-xl font-medium text-sm disabled:opacity-50"
+              >
+                {submitting ? 'Saving…' : (editingId ? 'Save Changes' : 'Create User')}
               </button>
               <button onClick={() => { setShowUserForm(false); setEditingId(null); }} className="flex-1 py-3 border border-zinc-700 rounded-xl text-sm">
                 Cancel
@@ -147,30 +227,38 @@ export default function AdminPanel({ users, setUsers, pos, setPOs, currentUser, 
           </div>
         )}
 
-        <div className="space-y-2">
-          {users.map(u => (
-            <div key={u.id} className="flex justify-between items-center bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-4">
-              <div className="min-w-0">
-                <div className="font-medium flex items-center gap-2 flex-wrap">
-                  {u.name}
-                  {u.role === 'Foreman' && u.assignedPO && (
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-900 text-emerald-400">{u.assignedPO}</span>
+        {loadingUsers ? (
+          <div className="text-zinc-500 text-sm">Loading users…</div>
+        ) : usersError ? (
+          <div className="text-rose-400 text-sm">{usersError}</div>
+        ) : (
+          <div className="space-y-2">
+            {users.map(u => (
+              <div key={u.id} className="flex justify-between items-center bg-zinc-900 border border-zinc-800 rounded-2xl px-5 py-4">
+                <div className="min-w-0">
+                  <div className="font-medium flex items-center gap-2 flex-wrap">
+                    {u.name}
+                    {u.role === 'Foreman' && u.assignedPO && (
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-900 text-emerald-400">{u.assignedPO}</span>
+                    )}
+                  </div>
+                  <div className="text-xs text-zinc-500">{u.role} · {u.email}</div>
+                </div>
+                <div className="flex gap-4 text-sm shrink-0">
+                  <button onClick={() => openEditUser(u)} className="text-emerald-400">Edit</button>
+                  {u.id !== currentUser.id && (
+                    <button onClick={() => deleteUser(u.id)} className="text-red-400">Remove</button>
                   )}
                 </div>
-                <div className="text-xs text-zinc-500">{u.role} · {u.email}</div>
               </div>
-              <div className="flex gap-4 text-sm shrink-0">
-                <button onClick={() => openEditUser(u)} className="text-emerald-400">Edit</button>
-                {u.id !== currentUser.id && (
-                  <button onClick={() => deleteUser(u.id)} className="text-red-400">Remove</button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+            {users.length === 0 && (
+              <div className="text-center py-6 text-zinc-500 text-sm">No users yet. Click + New User to add one.</div>
+            )}
+          </div>
+        )}
       </section>
 
-      {/* POs */}
       <section>
         <div className="flex justify-between items-center mb-3">
           <div className="font-semibold">PO# Jobs</div>

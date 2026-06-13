@@ -1,0 +1,8 @@
+name = "insultrack"
+pages_build_output_dir = "./out"
+compatibility_date = "2025-10-01"
+
+[[d1_databases]]
+binding = "insultrac"
+database_name = "insultrack"
+database_id = "29dd2e9b-a38d-4f0e-8906-b86c8f11fd74"

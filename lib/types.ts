@@ -167,6 +167,8 @@ export interface MaterialOrder {
   status: OrderStatus;
   driverId?: string;
   driverName?: string;
+  /** Driver-supplied estimated arrival (ISO datetime). Updated on Accept / En Route. */
+  eta?: string;
   createdAt: string;
   /** If this order is a Path B transfer (Reserve → Request delivery from City Map), source PO + reserved item ids. */
   sourcePO?: string;

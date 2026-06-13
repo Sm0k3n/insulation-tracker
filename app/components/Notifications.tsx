@@ -117,7 +117,7 @@ const TONE_BORDER: Record<NotificationEvent['tone'], string> = {
 
 export default function Notifications({ currentUser, transactions, orders }: NotificationsProps) {
   const [open, setOpen] = useState(false);
-  const [lastSeen, setLastSeen] = usePersistedState<string>(`insultrack-notif-seen-${currentUser.id}`, new Date(0).toISOString());
+  const [lastSeen, setLastSeen] = usePersistedState<string>(`insultrac-notif-seen-${currentUser.id}`, new Date(0).toISOString());
 
   const events = useMemo(
     () => deriveEvents(currentUser, transactions, orders),

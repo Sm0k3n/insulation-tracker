@@ -11,7 +11,7 @@ export const seedPOs: POJob[] = [
     address: '88 Canada Olympic Rd SW, Calgary, AB',
     latitude: 51.0822,
     longitude: -114.2150,
-    foremanId: '1',
+    foremanId: '2',
     contactName: 'Alex Rivera',
     contactPhone: '403-555-0123',
     status: 'Active',
@@ -24,7 +24,7 @@ export const seedPOs: POJob[] = [
     address: '1410 Olympic Way SE, Calgary, AB',
     latitude: 51.0383,
     longitude: -114.0561,
-    foremanId: '5',
+    foremanId: '3',
     contactName: 'Mike Torres',
     contactPhone: '403-555-0155',
     status: 'Active',
@@ -58,11 +58,11 @@ export const seedPOs: POJob[] = [
 ];
 
 export const seedUsers: User[] = [
-  { id: '1', name: 'Alex Rivera',  role: 'Foreman',         email: 'alex@insultrack.ca',   phone: '403-555-0123', assignedPO: 'WinSport' },
-  { id: '5', name: 'Mike Torres',  role: 'Foreman',         email: 'mike@insultrack.ca',   phone: '403-555-0155', assignedPO: 'Stampede Park' },
-  { id: '2', name: 'Jordan Hale',  role: 'Delivery Driver', email: 'jordan@insultrack.ca', phone: '403-555-0188' },
-  { id: '3', name: 'Sam Patel',    role: 'Employee',        email: 'sam@insultrack.ca',    phone: '403-555-0144' },
-  { id: '4', name: 'Taylor Kim',   role: 'Admin',           email: 'taylor@insultrack.ca', phone: '403-555-0199' },
+  { id: '1', name: 'Brent Barkman', role: 'Admin',           email: 'brent.r.barkman@gmail.com', phone: '' },
+  { id: '2', name: 'Alex Rivera',   role: 'Foreman',         email: 'alex@insultrac.com',        phone: '403-555-0123', assignedPO: 'WinSport' },
+  { id: '3', name: 'Mike Torres',   role: 'Foreman',         email: 'mike@insultrac.com',        phone: '403-555-0155', assignedPO: 'Stampede Park' },
+  { id: '4', name: 'Jordan Hale',   role: 'Delivery Driver', email: 'jordan@insultrac.com',      phone: '403-555-0188' },
+  { id: '5', name: 'Sam Patel',     role: 'Employee',        email: 'sam@insultrac.com',         phone: '403-555-0144' },
 ];
 
 // Realistic spread across categories + statuses
