@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InsulTrack • Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
+    
+    :root {
+      --font-sans: 'Inter', system_ui, sans-serif;
+    }
+    
+    body {
+      font-family: 'Inter', system_ui, sans-serif;
+    }
+    
+    .font-display {
+      font-family: 'Space Grotesk', 'Inter', system_ui, sans-serif;
+      font-weight: 600;
+    }
+
+    .tab-active {
+      background-color: #18181b;
+      color: white;
+      border-bottom: 3px solid #10b981;
+    }
+
+    .insul-card {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-white">
+  <div class="max-w-md mx-auto min-h-screen bg-zinc-950 border-x border-zinc-800">
+    
+    <!-- Header -->
+    <div class="sticky top-0 z-50 bg-zinc-950 border-b border-zinc-800 px-5 py-4 flex items-center justify-between">
+      <div>
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-emerald-600 rounded-2xl flex items-center justify-center">
+            <span class="font-display text-lg font-bold tracking-tighter">IT</span>
+          </div>
+          <div>
+            <div class="font-semibold tracking-tight text-xl">InsulTrack</div>
+            <div class="text-[10px] text-zinc-500 -mt-1">Mechanical Insulation • Field Ops</div>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-sm">
+        <div class="text-right">
+          <div class="text-emerald-400 text-sm font-medium">Alex Rivera</div>
+          <div class="text-[10px] text-zinc-500">Foreman • WinSport</div>
+        </div>
+        <button onclick="logout()" 
+                class="px-3 py-1.5 text-xs rounded-2xl border border-zinc-700 hover:bg-zinc-900 transition-colors">
+          Logout
+        </button>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="p-5 pb-24" id="main-content">
+      
+      <!-- Login Screen (hidden by default) -->
+      <div id="login-screen" class="hidden">
+        <div class="pt-12">
+          <div class="text-center mb-10">
+            <div class="mx-auto w-16 h-16 bg-emerald-600 rounded-3xl flex items-center justify-center mb-6">
+              <span class="font-display text-4xl font-bold tracking-tighter">IT</span>
+            </div>
+            <div class="text-4xl font-semibold tracking-tighter">InsulTrack</div>
+            <p class="text-zinc-400 mt-2">Mechanical Insulation Field Operations</p>
+          </div>
+
+          <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
+            <div class="text-xs text-zinc-400 mb-4 px-1">Select your account</div>
+            
+            <div class="space-y-2" onclick="loginAsDemo()">
+              <div class="flex justify-between items-center bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-2xl px-5 py-4 cursor-pointer">
+                <div>
+                  <div class="font-medium">Alex Rivera</div>
+                  <div class="text-xs text-zinc-500">Foreman • WinSport</div>
+                </div>
+                <div class="text-emerald-400 text-sm">Login →</div>
+              </div>
+              <div class="flex justify-between items-center bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-2xl px-5 py-4 cursor-pointer">
+                <div>
+                  <div class="font-medium">Taylor Kim</div>
+                  <div class="text-xs text-zinc-500">Admin</div>
+                </div>
+                <div class="text-emerald-400 text-sm">Login →</div>
+              </div>
+              <div class="flex justify-between items-center bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 rounded-2xl px-5 py-4 cursor-pointer">
+                <div>
+                  <div class="font-medium">Jordan Hale</div>
+                  <div class="text-xs text-zinc-500">Delivery Driver</div>
+                </div>
+                <div class="text-emerald-400 text-sm">Login →</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main App Content -->
+      <div id="app-content">
+        
+        <!-- Tab Content -->
+        <div id="tab-content">
+          <!-- Jobs Tab -->
+          <div id="tab-jobs">
+            <div class="mb-6">
+              <div class="flex items-end justify-between mb-4">
+                <div>
+                  <div class="text-2xl font-semibold tracking-tight">Active Jobs</div>
+                  <div class="text-sm text-zinc-400">4 active purchase orders</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <div onclick="showJobDetail('WinSport')" class="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 active:scale-[0.985] cursor-pointer">
+                <div class="flex justify-between">
+                  <div>
+                    <div class="font-semibold">WinSport</div>
+                    <div class="text-xs text-zinc-400 mt-0.5">Calgary, AB • 3 items</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-emerald-400 text-sm font-medium">On Site</div>
+                    <div class="text-[10px] text-zinc-500">Last activity: 2h ago</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div onclick="showJobDetail('Stampede Park')" class="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 active:scale-[0.985] cursor-pointer">
+                <div class="flex justify-between">
+                  <div>
+                    <div class="font-semibold">Stampede Park</div>
+                    <div class="text-xs text-zinc-400 mt-0.5">Calgary, AB • 2 items</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-emerald-400 text-sm font-medium">On Site</div>
+                    <div class="text-[10px] text-zinc-500">Last activity: yesterday</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Inventory Tab -->
+          <div id="tab-inventory" class="hidden">
+            <div class="mb-5">
+              <div class="text-2xl font-semibold tracking-tight mb-1">Inventory</div>
+              <div class="text-sm text-zinc-400">Showing 6 items available for pickup</div>
+            </div>
+            
+            <div class="space-y-3">
+              <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <div class="font-medium">2" IPS × 2" Fiberglass</div>
+                    <div class="text-xs text-zinc-400 mt-px">WinSport • 45 pcs</div>
+                  </div>
+                  <div class="text-emerald-400 text-sm font-medium px-3 py-1 bg-emerald-950 rounded-2xl text-center text-xs">Available</div>
+                </div>
+              </div>
+              <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <div class="font-medium">3" IPS × 1.5" Foamglass</div>
+                    <div class="text-xs text-zinc-400 mt-px">WinSport • 22 pcs</div>
+                  </div>
+                  <div class="text-amber-400 text-sm font-medium px-3 py-1 bg-amber-950 rounded-2xl text-center text-xs">On Site</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Transfers Tab -->
+          <div id="tab-transfers" class="hidden">
+            <div class="flex justify-between items-center mb-5">
+              <div>
+                <div class="text-2xl font-semibold tracking-tight">Transfers</div>
+                <div class="text-sm text-zinc-400">Move material between jobs</div>
+              </div>
+              <button onclick="showTransferModal()" 
+                      class="bg-emerald-600 hover:bg-emerald-700 transition-colors text-sm px-5 py-2 rounded-2xl font-medium">
+                + New
+              </button>
+            </div>
+            
+            <div class="space-y-3">
+              <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
+                <div class="flex justify-between">
+                  <div>
+                    <div class="font-medium">WinSport → Bow Tower</div>
+                    <div class="text-xs text-zinc-400">2" Fiberglass × 15</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-amber-400 text-sm">Pending</div>
+                    <div class="text-[10px] text-zinc-500">Alex Rivera</div>
+                  </div>
+                </div>
+                <button onclick="completeTransfer(this)" 
+                        class="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 py-2.5 rounded-2xl text-sm font-medium transition-colors">
+                  Complete Transfer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-zinc-950 border-t border-zinc-800 px-2 py-2">
+      <div class="flex justify-around text-xs">
+        <button onclick="switchTab('jobs')" class="flex flex-col items-center px-4 py-1 text-emerald-400">
+          <span class="text-xl mb-px">📋</span>
+          <span class="font-medium text-[10px]">Jobs</span>
+        </button>
+        <button onclick="switchTab('inventory')" class="flex flex-col items-center px-4 py-1 text-zinc-400 hover:text-white">
+          <span class="text-xl mb-px">📦</span>
+          <span class="font-medium text-[10px]">Inventory</span>
+        </button>
+        <button onclick="switchTab('transfers')" class="flex flex-col items-center px-4 py-1 text-zinc-400 hover:text-white">
+          <span class="text-xl mb-px">🔄</span>
+          <span class="font-medium text-[10px]">Transfers</span>
+        </button>
+        <button onclick="switchTab('map')" class="flex flex-col items-center px-4 py-1 text-zinc-400 hover:text-white">
+          <span class="text-xl mb-px">🗺️</span>
+          <span class="font-medium text-[10px]">Map</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tailwind script
+    function initializeTailwind() {
+      document.documentElement.style.setProperty('--accent', '#10b981');
+    }
+    
+    let currentTab = 'jobs';
+    
+    function switchTab(tab) {
+      // Hide all tabs
+      document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
+      
+      // Show selected tab
+      const target = document.getElementById('tab-' + tab);
+      if (target) target.classList.remove('hidden');
+      
+      currentTab = tab;
+    }
+    
+    function showJobDetail(po) {
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black/70 flex items-end z-[100]';
+      modal.innerHTML = `
+        <div class="bg-zinc-900 w-full rounded-t-3xl p-6 max-w-md mx-auto">
+          <div class="flex justify-between items-center mb-6">
+            <div>
+              <div class="font-semibold text-2xl">${po}</div>
+              <div class="text-emerald-400 text-sm">Active • 3 items assigned</div>
+            </div>
+            <button onclick="this.closest('.fixed').remove()" class="text-zinc-400 hover:text-white">✕</button>
+          </div>
+          
+          <div class="space-y-4 text-sm">
+            <div class="flex justify-between py-3 border-b border-zinc-800">
+              <div>Status</div>
+              <div class="font-medium text-emerald-400">On Site</div>
+            </div>
+            <div class="flex justify-between py-3 border-b border-zinc-800">
+              <div>Items on site</div>
+              <div class="font-medium">22 pcs</div>
+            </div>
+            <div class="flex justify-between py-3 border-b border-zinc-800">
+              <div>Foreman</div>
+              <div class="font-medium">Alex Rivera</div>
+            </div>
+          </div>
+          
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="mt-8 w-full bg-emerald-600 py-3.5 rounded-2xl font-medium">
+            Mark Job Complete
+          </button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+    
+    function showTransferModal() {
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black/70 flex items-end z-[100]';
+      modal.innerHTML = `
+        <div class="bg-zinc-900 w-full rounded-t-3xl p-6 max-w-md mx-auto">
+          <div class="font-semibold text-xl mb-5">New Transfer Request</div>
+          
+          <div class="space-y-4">
+            <div>
+              <div class="text-xs text-zinc-400 mb-1.5">From</div>
+              <input value="WinSport" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-4 py-3 text-sm">
+            </div>
+            <div>
+              <div class="text-xs text-zinc-400 mb-1.5">To</div>
+              <input placeholder="Bow Tower" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-4 py-3 text-sm">
+            </div>
+            <div>
+              <div class="text-xs text-zinc-400 mb-1.5">Material</div>
+              <input value="2\\" IPS × 2\\" Fiberglass" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-4 py-3 text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <div class="text-xs text-zinc-400 mb-1.5">Quantity</div>
+                <input type="number" value="15" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-4 py-3 text-sm">
+              </div>
+              <div>
+                <div class="text-xs text-zinc-400 mb-1.5">Unit</div>
+                <div class="bg-zinc-800 border border-zinc-700 rounded-2xl px-4 py-3 text-sm">pcs</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mt-7 flex gap-3">
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="flex-1 border border-zinc-700 py-3 rounded-2xl text-sm">Cancel</button>
+            <button onclick="submitTransferDemo(this)" 
+                    class="flex-1 bg-emerald-600 py-3 rounded-2xl text-sm font-medium">Request Transfer</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+    
+    function submitTransferDemo(btn) {
+      btn.closest('.fixed').remove();
+      
+      const toast = document.createElement('div');
+      toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-zinc-800 border border-zinc-700 px-5 py-3 rounded-2xl text-sm shadow-xl flex items-center gap-3';
+      toast.innerHTML = `
+        <div>Transfer request submitted</div>
+      `;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.transition = 'all 0.2s';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 200);
+      }, 2200);
+    }
+    
+    function completeTransfer(element) {
+      element.outerHTML = `<div class="mt-4 text-center text-emerald-400 text-sm py-1 font-medium">✓ Transfer Completed</div>`;
+    }
+    
+    function loginAsDemo() {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('app-content').classList.remove('hidden');
+      switchTab('jobs');
+    }
+    
+    function logout() {
+      document.getElementById('app-content').classList.add('hidden');
+      document.getElementById('login-screen').classList.remove('hidden');
+    }
+    
+    // Initialize
+    function init() {
+      initializeTailwind();
+      
+      // Start on login screen
+      document.getElementById('login-screen').classList.remove('hidden');
+      document.getElementById('app-content').classList.add('hidden');
+      
+      // Keyboard support
+      document.addEventListener('keydown', function(e) {
+        if (e.key === '/' && document.getElementById('app-content').classList.contains('hidden') === false) {
+          e.preventDefault();
+          switchTab('inventory');
+        }
+      });
+      
+      // Demo tip
+      console.log('%c[InsulTrack Preview] Click any job card or use bottom nav', 'color:#3f3f46');
+    }
+    
+    window.onload = init;
+  </script>
+</body>
+</html>

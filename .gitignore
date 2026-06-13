@@ -23,6 +23,8 @@
 # misc
 .DS_Store
 *.pem
+*.Zone.Identifier
+*:Zone.Identifier
 
 # debug
 npm-debug.log*
