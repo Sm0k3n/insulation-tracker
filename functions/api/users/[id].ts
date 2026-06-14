@@ -1,8 +1,21 @@
-import { bearer, DBUser, Env, err, hashPassword, json, loadCurrentUser, Role, toPublicUser } from '../../_lib/auth';
+import {
+  bearer,
+  DBUser,
+  EMAIL_REUSE_LIMIT,
+  Env,
+  err,
+  hashPassword,
+  json,
+  loadCurrentUser,
+  normalizeUsername,
+  Role,
+  toPublicUser,
+} from '../../_lib/auth';
 
 interface UpdateBody {
   name?: string;
   email?: string;
+  username?: string | null;
   password?: string;
   role?: Role;
   assignedPO?: string | null;
@@ -30,7 +43,38 @@ export const onRequestPatch: PagesFunction<Env> = async ({ request, env, params 
   const values: unknown[] = [];
 
   if (body.name !== undefined) { fields.push('name = ?'); values.push(body.name.trim()); }
-  if (body.email !== undefined) { fields.push('email = ?'); values.push(body.email.trim().toLowerCase()); }
+
+  if (body.email !== undefined) {
+    const newEmail = body.email.trim().toLowerCase();
+    if (newEmail !== current.email) {
+      const reuse = await env.insultrac
+        .prepare(`SELECT COUNT(*) AS c FROM users WHERE email = ? AND id != ?`)
+        .bind(newEmail, id)
+        .first<{ c: number }>();
+      if ((reuse?.c ?? 0) >= EMAIL_REUSE_LIMIT) {
+        return err(409, `That email has already been used ${EMAIL_REUSE_LIMIT} times.`);
+      }
+    }
+    fields.push('email = ?'); values.push(newEmail);
+  }
+
+  if (body.username !== undefined) {
+    if (body.username === null || body.username === '') {
+      fields.push('username = ?'); values.push(null);
+    } else {
+      const u = normalizeUsername(body.username);
+      if (!u) return err(400, 'Username must be 3–32 chars: letters, numbers, dot, underscore, hyphen.');
+      if (u !== current.username) {
+        const taken = await env.insultrac
+          .prepare(`SELECT id FROM users WHERE username = ? AND id != ?`)
+          .bind(u, id)
+          .first();
+        if (taken) return err(409, 'That username is already taken.');
+      }
+      fields.push('username = ?'); values.push(u);
+    }
+  }
+
   if (body.role !== undefined) {
     if (!ROLES.includes(body.role)) return err(400, 'Invalid role.');
     if (me.id !== 'admin-bootstrap' && me.role !== 'Admin' && body.role !== current.role) {

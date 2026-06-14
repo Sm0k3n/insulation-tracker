@@ -22,8 +22,8 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showUserForm, setShowUserForm] = useState(false);
-  const [form, setForm] = useState<{ name: string; role: User['role']; email: string; password: string; phone: string; assignedPO: string }>({
-    name: '', role: 'Employee', email: '', password: '', phone: '', assignedPO: '',
+  const [form, setForm] = useState<{ name: string; role: User['role']; email: string; username: string; password: string; phone: string; assignedPO: string }>({
+    name: '', role: 'Employee', email: '', username: '', password: '', phone: '', assignedPO: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -48,7 +48,7 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
 
   const openCreateUser = () => {
     setEditingId(null);
-    setForm({ name: '', role: 'Employee', email: '', password: '', phone: '', assignedPO: '' });
+    setForm({ name: '', role: 'Employee', email: '', username: '', password: '', phone: '', assignedPO: '' });
     setFormError(null);
     setShowUserForm(true);
   };
@@ -59,6 +59,7 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
       name: u.name,
       role: u.role,
       email: u.email,
+      username: u.username || '',
       password: '',
       phone: u.phone || '',
       assignedPO: u.assignedPO || '',
@@ -87,6 +88,7 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
         const body: any = {
           name: form.name,
           email: form.email,
+          username: form.username.trim() || null,
           role: form.role,
           phone: form.phone || null,
           assignedPO: form.role === 'Foreman' ? (form.assignedPO || null) : null,
@@ -97,6 +99,7 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
         await api.createUser({
           name: form.name,
           email: form.email,
+          username: form.username.trim() || null,
           password: form.password,
           role: form.role,
           phone: form.phone || null,
@@ -163,8 +166,6 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/admin.jpg" alt="" className="h-16 w-auto object-contain mb-2" />
           <div className="text-xl font-semibold">Admin</div>
           <div className="text-sm text-zinc-500">Manage users, PO jobs, and audit history</div>
         </div>
@@ -190,6 +191,13 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
                 className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
             </div>
             <input placeholder="Email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
+            <input
+              placeholder="Username (optional, 3–32 chars)"
+              value={form.username}
+              onChange={e => setForm({ ...form, username: e.target.value })}
+              autoCapitalize="none"
+              autoCorrect="off"
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
             <input
               placeholder={editingId ? 'New password (leave blank to keep current)' : 'Password (8+ characters)'}
@@ -242,7 +250,10 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
                       <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-900 text-emerald-400">{u.assignedPO}</span>
                     )}
                   </div>
-                  <div className="text-xs text-zinc-500">{u.role} · {u.email}</div>
+                  <div className="text-xs text-zinc-500">
+                    {u.role} · {u.email}
+                    {u.username && <span className="text-zinc-400"> · @{u.username}</span>}
+                  </div>
                 </div>
                 <div className="flex gap-4 text-sm shrink-0">
                   <button onClick={() => openEditUser(u)} className="text-emerald-400">Edit</button>

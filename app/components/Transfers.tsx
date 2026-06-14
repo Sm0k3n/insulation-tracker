@@ -89,8 +89,6 @@ export default function Transfers({ inventory, setInventory, currentUser, addTra
     <div>
       <div className="flex justify-between mb-6">
         <div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/transfers.jpg" alt="" className="h-16 w-auto object-contain mb-2" />
           <h1 className="text-2xl font-semibold">Transfers</h1>
           <p className="text-sm text-zinc-400">Move material between jobs</p>
         </div>

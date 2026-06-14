@@ -59,8 +59,6 @@ export default function Dashboard({ currentUser, pos, inventory, transactions, o
 
   return (
     <div className="space-y-6">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/icons/home.jpg" alt="" className="h-16 w-auto object-contain" />
       {/* Hero */}
       <div className="flex items-start gap-3">
         <div className="w-12 h-12 rounded-2xl bg-emerald-600/30 border border-emerald-700 text-emerald-300 flex items-center justify-center text-base font-semibold shrink-0">

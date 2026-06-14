@@ -79,8 +79,6 @@ export default function DailyReports({ inventory, setInventory, pos, currentUser
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/reports.jpg" alt="" className="h-16 w-auto object-contain mb-2" />
           <h1 className="text-2xl font-semibold">Daily Reports</h1>
           <p className="text-sm text-zinc-400">End-of-day submission · auto-deducts inventory</p>
         </div>

@@ -19,6 +19,7 @@ function normalizeUser(u: any): User {
   return {
     ...u,
     assignedPO: u.assignedPO ?? undefined,
+    username: u.username ?? undefined,
     phone: u.phone ?? '',
   } as User;
 }
@@ -64,17 +65,17 @@ export class ApiError extends Error {
 
 export const api = {
   setupNeeded: () => request<{ needed: boolean }>('GET', '/api/auth/setup'),
-  setup: (body: { name: string; email: string; password: string }) =>
+  setup: (body: { name: string; email: string; username?: string | null; password: string }) =>
     request<{ token: string; user: User }>('POST', '/api/auth/setup', body),
-  login: (body: { email: string; password: string }) =>
+  login: (body: { identifier: string; password: string }) =>
     request<{ token: string; user: User }>('POST', '/api/auth/login', body),
   logout: () => request<{ ok: true }>('POST', '/api/auth/logout'),
   me: () => request<{ user: User }>('GET', '/api/auth/me'),
 
   listUsers: () => request<{ users: User[] }>('GET', '/api/users'),
-  createUser: (body: { name: string; email: string; password: string; role: Role; assignedPO?: string | null; phone?: string | null }) =>
+  createUser: (body: { name: string; email: string; username?: string | null; password: string; role: Role; assignedPO?: string | null; phone?: string | null }) =>
     request<{ user: User }>('POST', '/api/users', body),
-  updateUser: (id: string, body: Partial<{ name: string; email: string; password: string; role: Role; assignedPO: string | null; phone: string | null }>) =>
+  updateUser: (id: string, body: Partial<{ name: string; email: string; username: string | null; password: string; role: Role; assignedPO: string | null; phone: string | null }>) =>
     request<{ user: User }>('PATCH', `/api/users/${id}`, body),
   deleteUser: (id: string) => request<{ ok: true }>('DELETE', `/api/users/${id}`),
 };

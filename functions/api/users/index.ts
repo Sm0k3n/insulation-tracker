@@ -1,8 +1,22 @@
-import { bearer, DBUser, Env, err, hashPassword, json, loadCurrentUser, newId, Role, toPublicUser } from '../../_lib/auth';
+import {
+  bearer,
+  DBUser,
+  EMAIL_REUSE_LIMIT,
+  Env,
+  err,
+  hashPassword,
+  json,
+  loadCurrentUser,
+  newId,
+  normalizeUsername,
+  Role,
+  toPublicUser,
+} from '../../_lib/auth';
 
 interface CreateUserBody {
   name: string;
   email: string;
+  username?: string | null;
   password: string;
   role: Role;
   assignedPO?: string | null;
@@ -37,11 +51,27 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const email = body.email.trim().toLowerCase();
-  const existing = await env.insultrac
-    .prepare(`SELECT id FROM users WHERE email = ?`)
+
+  let username: string | null = null;
+  if (body.username) {
+    username = normalizeUsername(body.username);
+    if (!username) {
+      return err(400, 'Username must be 3–32 chars: letters, numbers, dot, underscore, hyphen.');
+    }
+    const taken = await env.insultrac
+      .prepare(`SELECT id FROM users WHERE username = ?`)
+      .bind(username)
+      .first();
+    if (taken) return err(409, 'That username is already taken.');
+  }
+
+  const reuse = await env.insultrac
+    .prepare(`SELECT COUNT(*) AS c FROM users WHERE email = ?`)
     .bind(email)
-    .first();
-  if (existing) return err(409, 'A user with that email already exists.');
+    .first<{ c: number }>();
+  if ((reuse?.c ?? 0) >= EMAIL_REUSE_LIMIT) {
+    return err(409, `That email has already been used ${EMAIL_REUSE_LIMIT} times.`);
+  }
 
   const id = newId('u');
   const now = new Date().toISOString();
@@ -49,12 +79,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   await env.insultrac
     .prepare(
-      `INSERT INTO users (id, name, email, password_hash, password_salt, role, assigned_po, phone, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, name, username, email, password_hash, password_salt, role, assigned_po, phone, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
       body.name.trim(),
+      username,
       email,
       hash,
       salt,
@@ -69,6 +100,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     user: toPublicUser({
       id,
       name: body.name.trim(),
+      username,
       email,
       password_hash: hash,
       password_salt: salt,

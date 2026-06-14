@@ -10,6 +10,7 @@ export type Role = 'Admin' | 'Foreman' | 'Delivery Driver' | 'Employee';
 export interface DBUser {
   id: string;
   name: string;
+  username: string | null;
   email: string;
   password_hash: string;
   password_salt: string;
@@ -23,6 +24,7 @@ export interface DBUser {
 export interface PublicUser {
   id: string;
   name: string;
+  username: string | null;
   email: string;
   role: Role;
   assignedPO: string | null;
@@ -33,11 +35,22 @@ export function toPublicUser(u: DBUser): PublicUser {
   return {
     id: u.id,
     name: u.name,
+    username: u.username,
     email: u.email,
     role: u.role,
     assignedPO: u.assigned_po,
     phone: u.phone,
   };
+}
+
+// Each email may be used at most 4 times (one per role, for testing).
+export const EMAIL_REUSE_LIMIT = 4;
+
+const USERNAME_RE = /^[a-z0-9._-]{3,32}$/i;
+export function normalizeUsername(raw: string): string | null {
+  const v = raw.trim().toLowerCase();
+  if (!v) return null;
+  return USERNAME_RE.test(v) ? v : null;
 }
 
 function bufToHex(buf: ArrayBuffer): string {

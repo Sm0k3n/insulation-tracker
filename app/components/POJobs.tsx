@@ -29,8 +29,6 @@ export default function POJobs({ inventory, pos, currentUser }: POJobsProps) {
     <div>
       <div className="mb-6 flex justify-between items-start gap-3">
         <div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/pojobs.jpg" alt="" className="h-16 w-auto object-contain mb-2" />
           <h1 className="text-2xl font-semibold">PO# Jobs</h1>
           <p className="text-sm text-zinc-400">
             {currentUser.role === 'Foreman' ? 'Your assigned jobs' : `${visiblePOs.length} active job${visiblePOs.length === 1 ? '' : 's'}`}

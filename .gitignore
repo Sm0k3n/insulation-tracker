@@ -17,6 +17,10 @@
 /.next/
 /out/
 
+# wrangler / cloudflare local state
+.wrangler/
+.dev.vars
+
 # production
 /build
 

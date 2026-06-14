@@ -194,8 +194,6 @@ export default function CityMap({ inventory, pos, currentUser, setInventory, add
   return (
     <div className="space-y-4">
       <div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icons/map.jpg" alt="" className="h-16 w-auto object-contain mb-2" />
         <h1 className="text-2xl font-semibold">City Material Map</h1>
         <p className="text-sm text-zinc-400">
           Available for Pickup across Calgary

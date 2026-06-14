@@ -1,8 +1,9 @@
-import { Env, err, hashPassword, json, newId, newSessionToken, sessionExpiry, toPublicUser, Role } from '../../_lib/auth';
+import { Env, err, hashPassword, json, newId, newSessionToken, normalizeUsername, sessionExpiry, toPublicUser, Role } from '../../_lib/auth';
 
 interface SetupBody {
   name: string;
   email: string;
+  username?: string | null;
   password: string;
 }
 
@@ -23,16 +24,25 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const email = body.email.trim().toLowerCase();
+
+  let username: string | null = null;
+  if (body.username) {
+    username = normalizeUsername(body.username);
+    if (!username) {
+      return err(400, 'Username must be 3–32 chars: letters, numbers, dot, underscore, hyphen.');
+    }
+  }
+
   const id = newId('u');
   const now = new Date().toISOString();
   const { hash, salt } = await hashPassword(body.password);
 
   await env.insultrac
     .prepare(
-      `INSERT INTO users (id, name, email, password_hash, password_salt, role, assigned_po, phone, created_at)
-       VALUES (?, ?, ?, ?, ?, 'Admin', NULL, NULL, ?)`,
+      `INSERT INTO users (id, name, username, email, password_hash, password_salt, role, assigned_po, phone, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'Admin', NULL, NULL, ?)`,
     )
-    .bind(id, body.name.trim(), email, hash, salt, now)
+    .bind(id, body.name.trim(), username, email, hash, salt, now)
     .run();
 
   const token = newSessionToken();
@@ -46,6 +56,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     user: toPublicUser({
       id,
       name: body.name.trim(),
+      username,
       email,
       password_hash: hash,
       password_salt: salt,

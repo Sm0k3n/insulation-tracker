@@ -11,20 +11,27 @@ interface AuthScreenProps {
 
 export default function AuthScreen({ mode, onAuthed }: AuthScreenProps) {
   const [name, setName] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isSetup = mode === 'setup';
+
   const submit = async () => {
     setError(null);
-    if (!email || !password) {
-      setError('Email and password are required.');
-      return;
-    }
-    if (mode === 'setup' && !name) {
-      setError('Name is required.');
-      return;
+    if (isSetup) {
+      if (!name || !email || !password) {
+        setError('Name, email, and password are required.');
+        return;
+      }
+    } else {
+      if (!identifier || !password) {
+        setError('Email or username and password are required.');
+        return;
+      }
     }
     if (password.length < 8) {
       setError('Password must be at least 8 characters.');
@@ -32,9 +39,9 @@ export default function AuthScreen({ mode, onAuthed }: AuthScreenProps) {
     }
     setPending(true);
     try {
-      const r = mode === 'setup'
-        ? await api.setup({ name, email, password })
-        : await api.login({ email, password });
+      const r = isSetup
+        ? await api.setup({ name, email, username: username.trim() || null, password })
+        : await api.login({ identifier, password });
       setToken(r.token);
       onAuthed(r.user);
     } catch (e: any) {
@@ -43,8 +50,6 @@ export default function AuthScreen({ mode, onAuthed }: AuthScreenProps) {
       setPending(false);
     }
   };
-
-  const isSetup = mode === 'setup';
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6">
@@ -67,7 +72,7 @@ export default function AuthScreen({ mode, onAuthed }: AuthScreenProps) {
             <div className="text-xs text-zinc-500 mt-1">
               {isSetup
                 ? 'First user becomes the Admin. After this, only Admins can add accounts.'
-                : 'Enter your email and password.'}
+                : 'Enter your email or username and password.'}
             </div>
           </div>
 
@@ -75,31 +80,61 @@ export default function AuthScreen({ mode, onAuthed }: AuthScreenProps) {
             onSubmit={e => { e.preventDefault(); submit(); }}
             className="space-y-3"
           >
-            {isSetup && (
+            {isSetup ? (
+              <>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-zinc-500">Full name</label>
+                  <input
+                    type="text"
+                    autoComplete="name"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3 mt-1 text-sm focus:outline-none focus:border-emerald-600"
+                    placeholder="Brent Barkman"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-zinc-500">Email</label>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3 mt-1 text-sm focus:outline-none focus:border-emerald-600"
+                    placeholder="you@example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-zinc-500">Username (optional)</label>
+                  <input
+                    type="text"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3 mt-1 text-sm focus:outline-none focus:border-emerald-600"
+                    placeholder="brent (3–32 chars)"
+                  />
+                </div>
+              </>
+            ) : (
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-zinc-500">Full name</label>
+                <label className="text-[10px] uppercase tracking-wider text-zinc-500">Email or username</label>
                 <input
                   type="text"
-                  autoComplete="name"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  value={identifier}
+                  onChange={e => setIdentifier(e.target.value)}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3 mt-1 text-sm focus:outline-none focus:border-emerald-600"
-                  placeholder="Brent Barkman"
+                  placeholder="you@example.com or your username"
                 />
               </div>
             )}
-
-            <div>
-              <label className="text-[10px] uppercase tracking-wider text-zinc-500">Email</label>
-              <input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-4 py-3 mt-1 text-sm focus:outline-none focus:border-emerald-600"
-                placeholder="you@example.com"
-              />
-            </div>
 
             <div>
               <label className="text-[10px] uppercase tracking-wider text-zinc-500">Password</label>

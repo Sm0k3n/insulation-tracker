@@ -27,6 +27,13 @@ jobs:
 
       - run: npm run build
 
+      - name: Apply D1 migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 1aee2d260b97344f7c9cf484ed832140
+          command: d1 migrations apply insultrack --remote
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

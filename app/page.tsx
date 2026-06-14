@@ -182,7 +182,7 @@ export default function InsulTracApp() {
           <img
             src="/insultrac-logo.png"
             alt="InsulTrac"
-            className="h-20 w-auto invert"
+            className="h-7 w-auto invert"
           />
           <p className="text-[10px] text-zinc-500 mt-1">Mechanical Insulation · Field Ops</p>
         </div>

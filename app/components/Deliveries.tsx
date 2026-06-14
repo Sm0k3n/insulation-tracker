@@ -187,8 +187,6 @@ export default function Deliveries({
   return (
     <div className="space-y-6">
       <div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icons/deliveries.jpg" alt="" className="h-16 w-auto object-contain mb-2" />
         <h1 className="text-2xl font-semibold">Deliveries</h1>
         <p className="text-sm text-zinc-400">
           {isDriver ? "Today's runs, tomorrow, this week" : isAdmin ? 'All in-flight runs' : 'Active deliveries across all sites'}
