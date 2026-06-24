@@ -50,13 +50,18 @@ export default function CityMap({ inventory, pos, currentUser, setInventory, add
   const [pickupMethod, setPickupMethod] = useState<'self' | 'driver'>('self');
 
   const activePOs = useMemo(() => pos.filter(p => p.status !== 'Completed'), [pos]);
+  // Jobsites only — warehouses can be a SOURCE of pickups but never a destination/reference on the City Map.
+  const activeJobsitePOs = useMemo(
+    () => activePOs.filter(p => p.type !== 'warehouse'),
+    [activePOs],
+  );
 
   const referencePO = useMemo(() => {
     if (currentUser.assignedPO) {
-      return pos.find(p => p.poNumber === currentUser.assignedPO) || activePOs[0];
+      return pos.find(p => p.poNumber === currentUser.assignedPO) || activeJobsitePOs[0];
     }
-    return activePOs[0];
-  }, [pos, activePOs, currentUser]);
+    return activeJobsitePOs[0];
+  }, [pos, activeJobsitePOs, currentUser]);
 
   // Default the destination picker to the user's assigned PO when available.
   React.useEffect(() => {
@@ -307,7 +312,7 @@ export default function CityMap({ inventory, pos, currentUser, setInventory, add
                 onChange={e => setDestinationPO(e.target.value)}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-3 py-2.5 mt-1 text-sm focus:outline-none focus:border-emerald-600"
               >
-                {activePOs
+                {activeJobsitePOs
                   .filter(p => p.poNumber !== selected.poNumber)
                   .map(p => (
                     <option key={p.id} value={p.poNumber}>

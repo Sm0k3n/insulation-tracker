@@ -3,8 +3,19 @@ import type { InventoryItem, POJob, Transaction, User } from './types';
 const now = () => new Date().toISOString();
 const ago = (mins: number) => new Date(Date.now() - mins * 60_000).toISOString();
 
-// 4 real Calgary jobsites with real-ish lat/lng.
+// 4 real Calgary jobsites with real-ish lat/lng + the Airdrie warehouse.
 export const seedPOs: POJob[] = [
+  {
+    id: 'po-warehouse-airdrie',
+    poNumber: 'WH-AIRDRIE',
+    address: 'Airdrie, AB (Main Warehouse)',
+    latitude: 51.2917,
+    longitude: -114.0144,
+    type: 'warehouse',
+    status: 'Active',
+    notes: 'Main material warehouse — drivers add stock here and dispatch to jobsites',
+    createdAt: ago(60 * 24 * 365),
+  },
   {
     id: 'po-winsport',
     poNumber: 'WinSport',
@@ -143,6 +154,33 @@ export const seedInventory: InventoryItem[] = [
     id: 'i14', poNumber: 'McMahon Stadium', category: 'Pipe Insulation', status: 'Damaged',
     quantity: 7, unit: 'pcs', updatedAt: ago(160), updatedBy: 'Sarah Chen', notes: 'Water damage on bottom row of pallet',
     specs: { materialType: 'Fiberglass', pipeSize: '4"', insulationThickness: '2"', length: '3 ft' },
+  },
+
+  // WH-AIRDRIE warehouse stock (driver-managed; ready to dispatch to jobsites)
+  {
+    id: 'i-wh1', poNumber: 'WH-AIRDRIE', category: 'Pipe Insulation', status: 'Available for Pickup',
+    quantity: 180, unit: 'pcs', updatedAt: ago(60 * 6), updatedBy: 'Jordan Hale',
+    specs: { materialType: 'Fiberglass', pipeSize: '2"', insulationThickness: '2"', length: '3 ft', jacketType: 'ASJ', manufacturer: 'Owens Corning' },
+  },
+  {
+    id: 'i-wh2', poNumber: 'WH-AIRDRIE', category: 'Pipe Insulation', status: 'Available for Pickup',
+    quantity: 95, unit: 'pcs', updatedAt: ago(60 * 24 * 2), updatedBy: 'Jordan Hale',
+    specs: { materialType: 'Fiberglass', pipeSize: '4"', insulationThickness: '2"', length: '3 ft', jacketType: 'ASJ', manufacturer: 'Owens Corning' },
+  },
+  {
+    id: 'i-wh3', poNumber: 'WH-AIRDRIE', category: 'Jacketing', status: 'Available for Pickup',
+    quantity: 22, unit: 'rolls', updatedAt: ago(60 * 18), updatedBy: 'Jordan Hale',
+    specs: { materialType: 'Aluminum Jacketing', gauge: '0.016"', width: '36"', length: '50 ft' },
+  },
+  {
+    id: 'i-wh4', poNumber: 'WH-AIRDRIE', category: 'Consumable', status: 'Available for Pickup',
+    quantity: 48, unit: 'rolls', updatedAt: ago(60 * 30), updatedBy: 'Jordan Hale',
+    specs: { productName: 'ASJ Tape 3"', manufacturer: 'Venture' },
+  },
+  {
+    id: 'i-wh5', poNumber: 'WH-AIRDRIE', category: 'Fitting Cover', status: 'Available for Pickup',
+    quantity: 60, unit: 'pcs', updatedAt: ago(60 * 48), updatedBy: 'Jordan Hale',
+    specs: { fittingType: 'PVC 90', pipeSize: '2"', insulationThickness: '2"' },
   },
 ];
 

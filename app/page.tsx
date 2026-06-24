@@ -56,6 +56,20 @@ export default function InsulTracApp() {
     setInventory(prev => prev.map(normalizeInventoryItem));
   }, [inventory, setInventory]);
 
+  // Backfill warehouses + warehouse seed stock for users with pre-warehouse persisted state.
+  useEffect(() => {
+    const missingWarehouses = seedPOs
+      .filter(p => p.type === 'warehouse')
+      .filter(p => !pos.some(existing => existing.poNumber === p.poNumber));
+    if (missingWarehouses.length === 0) return;
+    setPOs(prev => [...missingWarehouses, ...prev]);
+    const warehousePOSet = new Set(missingWarehouses.map(p => p.poNumber));
+    const missingStock = seedInventory.filter(i => warehousePOSet.has(i.poNumber));
+    if (missingStock.length > 0) {
+      setInventory(prev => [...missingStock, ...prev]);
+    }
+  }, [pos, setPOs, setInventory]);
+
   // Boot: check session token → /me, else decide setup vs login.
   useEffect(() => {
     let cancelled = false;

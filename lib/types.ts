@@ -93,6 +93,8 @@ export interface POJob {
   address: string;
   latitude: number;
   longitude: number;
+  /** 'warehouse' is a stock-holding location (no foreman, not on City Map jobsite list). Defaults to 'jobsite'. */
+  type?: 'jobsite' | 'warehouse';
   foremanId?: string;
   contactName?: string;
   contactPhone?: string;

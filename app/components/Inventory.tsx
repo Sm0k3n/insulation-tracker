@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import type { InventoryItem, InventoryStatus, MaterialCategory, POJob, User } from '@/lib/types';
 import { INVENTORY_STATUSES, MATERIAL_CATEGORIES } from '@/lib/types';
-import { itemTitle, itemSubtitle, itemSummary, statusClass, relativeTime } from '@/lib/util';
+import { itemTitle, itemSubtitle, itemSummary, statusClass, relativeTime, newId } from '@/lib/util';
 import { makeTransaction } from '@/lib/util';
 import { downloadCSV, todayStamp, toCSV } from '@/lib/csv';
 
@@ -29,11 +29,20 @@ export default function Inventory({ inventory, setInventory, pos, currentUser, a
   const [filterCategory, setFilterCategory] = useState<MaterialCategory | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<InventoryStatus | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
 
   const isForeman = currentUser.role === 'Foreman';
   const isAdmin = currentUser.role === 'Admin';
+  const isDriver = currentUser.role === 'Delivery Driver';
+  const warehousePONumbers = useMemo(
+    () => new Set(pos.filter(p => p.type === 'warehouse').map(p => p.poNumber)),
+    [pos],
+  );
+  const isWarehousePO = (poNumber: string) => warehousePONumbers.has(poNumber);
   const canEditItem = (item: InventoryItem) =>
-    isAdmin || (isForeman && (!currentUser.assignedPO || item.poNumber === currentUser.assignedPO));
+    isAdmin ||
+    (isForeman && (!currentUser.assignedPO || item.poNumber === currentUser.assignedPO)) ||
+    (isDriver && isWarehousePO(item.poNumber));
 
   const visible = useMemo(() => {
     return inventory.filter(item => {
@@ -67,6 +76,37 @@ export default function Inventory({ inventory, setInventory, pos, currentUser, a
       fromStatus: item.status,
       toStatus: next,
     });
+  };
+
+  const canAddStock = isAdmin || isDriver;
+  const warehouses = useMemo(() => pos.filter(p => p.type === 'warehouse'), [pos]);
+
+  const addStock = (draft: NewStockDraft) => {
+    const now = new Date().toISOString();
+    const item: InventoryItem = {
+      id: newId('i'),
+      poNumber: draft.poNumber,
+      category: draft.category,
+      status: 'Available for Pickup',
+      quantity: draft.quantity,
+      unit: draft.unit,
+      notes: draft.notes || undefined,
+      updatedAt: now,
+      updatedBy: currentUser.name,
+      specs: draft.specs,
+    };
+    setInventory(prev => [item, ...prev]);
+    addTransaction({
+      poNumber: item.poNumber,
+      itemId: item.id,
+      user: currentUser.name,
+      action: 'added',
+      materialSummary: itemSummary(item),
+      quantity: item.quantity,
+      toStatus: 'Available for Pickup',
+      notes: `Added to ${item.poNumber}`,
+    });
+    setAddOpen(false);
   };
 
   const exportCSV = () => {
@@ -107,17 +147,29 @@ export default function Inventory({ inventory, setInventory, pos, currentUser, a
               ? `Editing enabled for ${currentUser.assignedPO}`
               : isAdmin
                 ? 'All sites · edit any'
-                : 'Read-only view'}
+                : isDriver
+                  ? 'Warehouse stock · edit warehouse, dispatch to jobsites'
+                  : 'Read-only view'}
           </p>
         </div>
-        {visible.length > 0 && (
-          <button
-            onClick={exportCSV}
-            className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-full shrink-0 mt-1"
-          >
-            ⬇ Export CSV
-          </button>
-        )}
+        <div className="flex gap-2 shrink-0 mt-1">
+          {canAddStock && warehouses.length > 0 && (
+            <button
+              onClick={() => setAddOpen(true)}
+              className="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-full"
+            >
+              + Add Stock
+            </button>
+          )}
+          {visible.length > 0 && (
+            <button
+              onClick={exportCSV}
+              className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-full"
+            >
+              ⬇ Export CSV
+            </button>
+          )}
+        </div>
       </div>
 
       <input
@@ -127,7 +179,19 @@ export default function Inventory({ inventory, setInventory, pos, currentUser, a
         className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 text-sm mb-3 focus:outline-none focus:border-emerald-600"
       />
 
-      <FilterRow label="PO" value={filterPO} onChange={setFilterPO} options={['all', ...pos.map(p => p.poNumber)]} />
+      <FilterRow
+        label="Location"
+        value={filterPO}
+        onChange={setFilterPO}
+        options={[
+          'all',
+          ...pos.filter(p => p.type === 'warehouse').map(p => p.poNumber),
+          ...pos.filter(p => p.type !== 'warehouse').map(p => p.poNumber),
+        ]}
+        renderLabel={opt =>
+          opt === 'all' ? 'All' : isWarehousePO(opt) ? `🏭 ${opt}` : opt
+        }
+      />
       <FilterRow label="Category" value={filterCategory} onChange={setFilterCategory} options={['all', ...MATERIAL_CATEGORIES]} />
       <FilterRow label="Status" value={filterStatus} onChange={setFilterStatus} options={['all', ...INVENTORY_STATUSES]} compact />
 
@@ -141,7 +205,9 @@ export default function Inventory({ inventory, setInventory, pos, currentUser, a
               <div className="flex justify-between items-start gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <div className="font-semibold text-emerald-400">{item.poNumber}</div>
+                    <div className={`font-semibold ${isWarehousePO(item.poNumber) ? 'text-amber-300' : 'text-emerald-400'}`}>
+                      {isWarehousePO(item.poNumber) ? `🏭 ${item.poNumber}` : item.poNumber}
+                    </div>
                     <span className={`text-[10px] px-2 py-0.5 rounded-full border ${CATEGORY_TONE[item.category]}`}>
                       {item.category}
                     </span>
@@ -183,6 +249,171 @@ export default function Inventory({ inventory, setInventory, pos, currentUser, a
           <div className="text-center py-12 text-zinc-500">No matching inventory.</div>
         )}
       </div>
+
+      {addOpen && (
+        <AddStockModal
+          warehouses={warehouses}
+          onClose={() => setAddOpen(false)}
+          onSubmit={addStock}
+        />
+      )}
+    </div>
+  );
+}
+
+type NewStockDraft = {
+  poNumber: string;
+  category: MaterialCategory;
+  quantity: number;
+  unit: string;
+  notes: string;
+  specs: InventoryItem['specs'];
+};
+
+function AddStockModal({
+  warehouses,
+  onClose,
+  onSubmit,
+}: {
+  warehouses: POJob[];
+  onClose: () => void;
+  onSubmit: (draft: NewStockDraft) => void;
+}) {
+  const [poNumber, setPoNumber] = useState(warehouses[0]?.poNumber ?? '');
+  const [category, setCategory] = useState<MaterialCategory>('Pipe Insulation');
+  const [quantity, setQuantity] = useState<number>(1);
+  const [unit, setUnit] = useState('pcs');
+  const [notes, setNotes] = useState('');
+  // Spec fields — only the ones relevant to the selected category get used.
+  const [materialType, setMaterialType] = useState('');
+  const [manufacturer, setManufacturer] = useState('');
+  const [pipeSize, setPipeSize] = useState('');
+  const [thickness, setThickness] = useState('');
+  const [length, setLength] = useState('');
+  const [jacketType, setJacketType] = useState('');
+  const [fittingType, setFittingType] = useState('');
+  const [width, setWidth] = useState('');
+  const [gauge, setGauge] = useState('');
+  const [productName, setProductName] = useState('');
+
+  const submit = () => {
+    if (!poNumber || quantity <= 0) return;
+    const specs: InventoryItem['specs'] = {};
+    if (materialType) specs.materialType = materialType;
+    if (manufacturer) specs.manufacturer = manufacturer;
+    if (pipeSize) specs.pipeSize = pipeSize;
+    if (thickness) specs.insulationThickness = thickness;
+    if (length) specs.length = length;
+    if (jacketType) specs.jacketType = jacketType;
+    if (fittingType) specs.fittingType = fittingType;
+    if (width) specs.width = width;
+    if (gauge) specs.gauge = gauge;
+    if (productName) specs.productName = productName;
+    onSubmit({ poNumber, category, quantity, unit, notes, specs });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div
+        className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-3xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto p-5"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">Add Stock to Warehouse</h2>
+          <button onClick={onClose} className="text-zinc-400 hover:text-white text-xl leading-none">×</button>
+        </div>
+
+        <Field label="Location">
+          <select value={poNumber} onChange={e => setPoNumber(e.target.value)} className={inputClass}>
+            {warehouses.map(w => <option key={w.id} value={w.poNumber}>🏭 {w.poNumber}</option>)}
+          </select>
+        </Field>
+
+        <Field label="Category">
+          <select value={category} onChange={e => setCategory(e.target.value as MaterialCategory)} className={inputClass}>
+            {MATERIAL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </Field>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Quantity">
+            <input type="number" min={1} value={quantity} onChange={e => setQuantity(Number(e.target.value))} className={inputClass} />
+          </Field>
+          <Field label="Unit">
+            <input value={unit} onChange={e => setUnit(e.target.value)} placeholder="pcs / rolls / tubes" className={inputClass} />
+          </Field>
+        </div>
+
+        {category === 'Pipe Insulation' && (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Material"><input value={materialType} onChange={e => setMaterialType(e.target.value)} placeholder="Fiberglass" className={inputClass} /></Field>
+              <Field label="Manufacturer"><input value={manufacturer} onChange={e => setManufacturer(e.target.value)} placeholder="Owens Corning" className={inputClass} /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Pipe size"><input value={pipeSize} onChange={e => setPipeSize(e.target.value)} placeholder='2"' className={inputClass} /></Field>
+              <Field label="Thickness"><input value={thickness} onChange={e => setThickness(e.target.value)} placeholder='2"' className={inputClass} /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Length"><input value={length} onChange={e => setLength(e.target.value)} placeholder="3 ft" className={inputClass} /></Field>
+              <Field label="Jacket"><input value={jacketType} onChange={e => setJacketType(e.target.value)} placeholder="ASJ / FSK / None" className={inputClass} /></Field>
+            </div>
+          </>
+        )}
+
+        {category === 'Fitting Cover' && (
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Fitting type"><input value={fittingType} onChange={e => setFittingType(e.target.value)} placeholder="PVC 90 / Tee" className={inputClass} /></Field>
+            <Field label="Pipe size"><input value={pipeSize} onChange={e => setPipeSize(e.target.value)} placeholder='2"' className={inputClass} /></Field>
+          </div>
+        )}
+
+        {category === 'Duct Wrap' && (
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Thickness"><input value={thickness} onChange={e => setThickness(e.target.value)} placeholder='1.5"' className={inputClass} /></Field>
+            <Field label="Width"><input value={width} onChange={e => setWidth(e.target.value)} placeholder='48"' className={inputClass} /></Field>
+          </div>
+        )}
+
+        {category === 'Jacketing' && (
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Material"><input value={materialType} onChange={e => setMaterialType(e.target.value)} placeholder="Aluminum" className={inputClass} /></Field>
+            <Field label="Gauge"><input value={gauge} onChange={e => setGauge(e.target.value)} placeholder='0.016"' className={inputClass} /></Field>
+          </div>
+        )}
+
+        {(category === 'Consumable' || category === 'Equipment') && (
+          <Field label="Product name">
+            <input value={productName} onChange={e => setProductName(e.target.value)} placeholder="ASJ Tape 3&quot; / Baker Scaffold" className={inputClass} />
+          </Field>
+        )}
+
+        <Field label="Notes (optional)">
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className={inputClass} />
+        </Field>
+
+        <div className="flex gap-2 mt-4">
+          <button onClick={onClose} className="flex-1 bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-2.5 text-sm">Cancel</button>
+          <button
+            onClick={submit}
+            disabled={!poNumber || quantity <= 0}
+            className="flex-1 bg-emerald-700 hover:bg-emerald-600 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-2xl py-2.5 text-sm font-medium"
+          >
+            Add Stock
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const inputClass = 'w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-600';
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-3">
+      <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1 block">{label}</label>
+      {children}
     </div>
   );
 }
@@ -193,12 +424,14 @@ function FilterRow<T extends string>({
   onChange,
   options,
   compact = false,
+  renderLabel,
 }: {
   label: string;
   value: T | 'all';
   onChange: (v: any) => void;
   options: (T | 'all')[];
   compact?: boolean;
+  renderLabel?: (opt: T | 'all') => string;
 }) {
   return (
     <div className="mb-2">
@@ -212,7 +445,7 @@ function FilterRow<T extends string>({
               value === opt ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-zinc-900 border-zinc-800 text-zinc-300'
             }`}
           >
-            {opt === 'all' ? 'All' : opt}
+            {renderLabel ? renderLabel(opt) : opt === 'all' ? 'All' : opt}
           </button>
         ))}
       </div>

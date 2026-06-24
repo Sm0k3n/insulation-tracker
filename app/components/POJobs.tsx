@@ -14,15 +14,18 @@ interface POJobsProps {
 export default function POJobs({ inventory, pos, currentUser }: POJobsProps) {
   const [showCompleted, setShowCompleted] = useState(false);
 
+  // Jobsite-only list. Warehouses are stock locations, not jobs.
+  const jobsiteOnly = useMemo(() => pos.filter(p => p.type !== 'warehouse'), [pos]);
+
   const visiblePOs = useMemo(() => {
     // Foreman with an assigned PO always sees their own job regardless of status.
     if (currentUser.role === 'Foreman' && currentUser.assignedPO) {
-      return pos.filter(p => p.poNumber === currentUser.assignedPO);
+      return jobsiteOnly.filter(p => p.poNumber === currentUser.assignedPO);
     }
-    return showCompleted ? pos : pos.filter(p => p.status !== 'Completed');
-  }, [pos, currentUser, showCompleted]);
+    return showCompleted ? jobsiteOnly : jobsiteOnly.filter(p => p.status !== 'Completed');
+  }, [jobsiteOnly, currentUser, showCompleted]);
 
-  const completedCount = pos.filter(p => p.status === 'Completed').length;
+  const completedCount = jobsiteOnly.filter(p => p.status === 'Completed').length;
   const showToggle = !(currentUser.role === 'Foreman' && currentUser.assignedPO) && completedCount > 0;
 
   return (
