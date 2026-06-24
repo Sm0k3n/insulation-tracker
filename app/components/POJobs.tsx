@@ -14,18 +14,21 @@ interface POJobsProps {
 export default function POJobs({ inventory, pos, currentUser }: POJobsProps) {
   const [showCompleted, setShowCompleted] = useState(false);
 
-  // Jobsite-only list. Warehouses are stock locations, not jobs.
-  const jobsiteOnly = useMemo(() => pos.filter(p => p.type !== 'warehouse'), [pos]);
+  // Sort: warehouses pinned to the top, then jobsites.
+  const sorted = useMemo(
+    () => [...pos].sort((a, b) => (a.type === 'warehouse' ? -1 : b.type === 'warehouse' ? 1 : 0)),
+    [pos],
+  );
 
   const visiblePOs = useMemo(() => {
     // Foreman with an assigned PO always sees their own job regardless of status.
     if (currentUser.role === 'Foreman' && currentUser.assignedPO) {
-      return jobsiteOnly.filter(p => p.poNumber === currentUser.assignedPO);
+      return sorted.filter(p => p.poNumber === currentUser.assignedPO);
     }
-    return showCompleted ? jobsiteOnly : jobsiteOnly.filter(p => p.status !== 'Completed');
-  }, [jobsiteOnly, currentUser, showCompleted]);
+    return showCompleted ? sorted : sorted.filter(p => p.status !== 'Completed');
+  }, [sorted, currentUser, showCompleted]);
 
-  const completedCount = jobsiteOnly.filter(p => p.status === 'Completed').length;
+  const completedCount = sorted.filter(p => p.type !== 'warehouse' && p.status === 'Completed').length;
   const showToggle = !(currentUser.role === 'Foreman' && currentUser.assignedPO) && completedCount > 0;
 
   return (
@@ -53,21 +56,29 @@ export default function POJobs({ inventory, pos, currentUser }: POJobsProps) {
           const availableCount = items.filter(i => i.status === 'Available for Pickup').length;
           const reservedCount = items.filter(i => i.status === 'Reserved').length;
           const photoCount = po.photos?.length ?? 0;
+          const isWarehouse = po.type === 'warehouse';
           return (
             <Link
               key={po.id}
               href={`/po/?n=${encodeURIComponent(po.poNumber)}`}
-              className="block bg-zinc-900 border border-zinc-800 rounded-3xl p-5 active:bg-zinc-800 hover:border-zinc-700 transition-all"
+              className={`block rounded-3xl p-5 active:bg-zinc-800 transition-all ${
+                isWarehouse
+                  ? 'bg-amber-950/30 border border-amber-800/60 hover:border-amber-700'
+                  : 'bg-zinc-900 border border-zinc-800 hover:border-zinc-700'
+              }`}
             >
               <div className="flex justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-semibold text-xl truncate">{po.poNumber}</div>
+                  <div className={`font-semibold text-xl truncate ${isWarehouse ? 'text-amber-300' : ''}`}>
+                    {isWarehouse ? `🏭 ${po.poNumber}` : po.poNumber}
+                  </div>
                   <div className="text-sm text-zinc-400 truncate">{po.address}</div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className={`text-xs ${
+                    isWarehouse ? 'text-amber-300' :
                     po.status === 'Active' ? 'text-emerald-400' : po.status === 'On Hold' ? 'text-amber-300' : 'text-zinc-500'
-                  }`}>{po.status}</div>
+                  }`}>{isWarehouse ? 'Warehouse' : po.status}</div>
                 </div>
               </div>
 
