@@ -15,11 +15,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const ident = raw.toLowerCase();
-  // Match by either username OR email. If multiple accounts share the email,
-  // the password lookup below identifies the right one.
+  // Match by email only until the username migration is applied to the remote D1.
+  // The password lookup below identifies the right account if multiple share the email.
   const result = await env.insultrac
-    .prepare(`SELECT * FROM users WHERE username = ? OR email = ?`)
-    .bind(ident, ident)
+    .prepare(`SELECT * FROM users WHERE email = ?`)
+    .bind(ident)
     .all<DBUser>();
 
   const candidates = result.results || [];
