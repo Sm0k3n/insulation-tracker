@@ -29,7 +29,7 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
   const [formError, setFormError] = useState<string | null>(null);
 
   const [showPOForm, setShowPOForm] = useState(false);
-  const [poForm, setPOForm] = useState({ poNumber: '', address: '', contactName: '', contactPhone: '', latitude: '51.04', longitude: '-114.06', notes: '' });
+  const [poForm, setPOForm] = useState({ poNumber: '', address: '', contactName: '', contactPhone: '', latitude: '', longitude: '', notes: '' });
 
   const loadUsers = async () => {
     setLoadingUsers(true);
@@ -68,18 +68,16 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
     setShowUserForm(true);
   };
 
+  const [inviteFlash, setInviteFlash] = useState<string | null>(null);
+
   const saveUser = async () => {
     setFormError(null);
     if (!form.name || !form.email) {
       setFormError('Name and email are required.');
       return;
     }
-    if (!editingId && form.password.length < 8) {
+    if (form.password && form.password.length < 8) {
       setFormError('Password must be at least 8 characters.');
-      return;
-    }
-    if (editingId && form.password && form.password.length < 8) {
-      setFormError('New password must be at least 8 characters.');
       return;
     }
     setSubmitting(true);
@@ -96,15 +94,21 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
         if (form.password) body.password = form.password;
         await api.updateUser(editingId, body);
       } else {
-        await api.createUser({
+        const result = await api.createUser({
           name: form.name,
           email: form.email,
           username: form.username.trim() || null,
-          password: form.password,
+          password: form.password || undefined,
           role: form.role,
           phone: form.phone || null,
           assignedPO: form.role === 'Foreman' ? (form.assignedPO || null) : null,
         });
+        setInviteFlash(
+          result.inviteSent
+            ? `✉️  Invite email sent to ${form.email}`
+            : `⚠️  User created but invite email failed: ${result.inviteError || 'unknown error'}`,
+        );
+        setTimeout(() => setInviteFlash(null), 6000);
       }
       await loadUsers();
       setShowUserForm(false);
@@ -139,18 +143,48 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
     setPOs(prev => prev.filter(p => p.id !== po.id));
   };
 
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
+
+  const geocodeAddress = async () => {
+    setGeocodeError(null);
+    const q = poForm.address.trim();
+    if (!q) {
+      setGeocodeError('Enter an address first.');
+      return;
+    }
+    setGeocoding(true);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error(`Lookup failed (${res.status})`);
+      const data = (await res.json()) as Array<{ lat: string; lon: string }>;
+      if (!data.length) {
+        setGeocodeError('No match for that address. You can still save without coords.');
+        return;
+      }
+      setPOForm(prev => ({ ...prev, latitude: data[0].lat, longitude: data[0].lon }));
+    } catch (e: any) {
+      setGeocodeError(e?.message || 'Lookup failed.');
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
   const savePO = () => {
-    const lat = parseFloat(poForm.latitude);
-    const lng = parseFloat(poForm.longitude);
-    if (!poForm.poNumber || !poForm.address || Number.isNaN(lat) || Number.isNaN(lng)) return;
+    if (!poForm.poNumber || !poForm.address) return;
+    const latRaw = poForm.latitude.trim();
+    const lngRaw = poForm.longitude.trim();
+    const lat = latRaw ? parseFloat(latRaw) : NaN;
+    const lng = lngRaw ? parseFloat(lngRaw) : NaN;
     setPOs(prev => [
       ...prev,
       {
         id: `po-${Date.now()}`,
         poNumber: poForm.poNumber,
         address: poForm.address,
-        latitude: lat,
-        longitude: lng,
+        latitude: Number.isFinite(lat) ? lat : undefined,
+        longitude: Number.isFinite(lng) ? lng : undefined,
         contactName: poForm.contactName,
         contactPhone: poForm.contactPhone,
         notes: poForm.notes,
@@ -158,7 +192,8 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
         createdAt: new Date().toISOString(),
       },
     ]);
-    setPOForm({ poNumber: '', address: '', contactName: '', contactPhone: '', latitude: '51.04', longitude: '-114.06', notes: '' });
+    setPOForm({ poNumber: '', address: '', contactName: '', contactPhone: '', latitude: '', longitude: '', notes: '' });
+    setGeocodeError(null);
     setShowPOForm(false);
   };
 
@@ -177,6 +212,14 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
           <div className="font-semibold">Users {users.length > 0 && <span className="text-xs text-zinc-500 ml-1">({users.length})</span>}</div>
           <button onClick={openCreateUser} className="px-3 py-1.5 bg-emerald-600 rounded-xl text-xs">+ New User</button>
         </div>
+
+        {inviteFlash && (
+          <div className={`mb-3 px-4 py-2.5 rounded-xl text-sm border ${
+            inviteFlash.startsWith('✉️') ? 'bg-emerald-950/40 border-emerald-800 text-emerald-200' : 'bg-amber-950/40 border-amber-800 text-amber-200'
+          }`}>
+            {inviteFlash}
+          </div>
+        )}
 
         {showUserForm && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-4 space-y-3">
@@ -200,7 +243,7 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
               autoCorrect="off"
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
             <input
-              placeholder={editingId ? 'New password (leave blank to keep current)' : 'Password (8+ characters)'}
+              placeholder={editingId ? 'New password (leave blank to keep current)' : 'Password (leave blank to send invite email)'}
               type="password"
               value={form.password}
               onChange={e => setForm({ ...form, password: e.target.value })}
@@ -282,9 +325,29 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
             <input placeholder="Address" value={poForm.address} onChange={e => setPOForm({ ...poForm, address: e.target.value })}
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
-            <div className="grid grid-cols-2 gap-3">
-              <input placeholder="Latitude"  value={poForm.latitude}  onChange={e => setPOForm({ ...poForm, latitude:  e.target.value })} className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
-              <input placeholder="Longitude" value={poForm.longitude} onChange={e => setPOForm({ ...poForm, longitude: e.target.value })} className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-[2px] text-zinc-500">Coordinates (optional)</span>
+                <button
+                  type="button"
+                  onClick={geocodeAddress}
+                  disabled={geocoding}
+                  className="text-xs text-emerald-400 hover:text-emerald-300 disabled:text-zinc-600"
+                >
+                  {geocoding ? 'Looking up…' : '📍 Auto-fill from address'}
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <input placeholder="Latitude (optional)"  value={poForm.latitude}  onChange={e => setPOForm({ ...poForm, latitude:  e.target.value })} className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
+                <input placeholder="Longitude (optional)" value={poForm.longitude} onChange={e => setPOForm({ ...poForm, longitude: e.target.value })} className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
+              </div>
+              {geocodeError && (
+                <div className="text-xs text-amber-300">{geocodeError}</div>
+              )}
+              <div className="text-[11px] text-zinc-500">
+                Coords are only needed if you want this PO to appear on the City Map.
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <input placeholder="Contact name" value={poForm.contactName} onChange={e => setPOForm({ ...poForm, contactName: e.target.value })} className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm" />
@@ -307,7 +370,11 @@ export default function AdminPanel({ pos, setPOs, currentUser, onOpenHistory }: 
                   </div>
                   <div className="text-xs text-zinc-400 text-right shrink-0">
                     {foreman ? `Foreman: ${foreman.name}` : 'No foreman'}<br />
-                    <span className="text-zinc-600 font-mono">{p.latitude.toFixed(3)}, {p.longitude.toFixed(3)}</span>
+                    <span className="text-zinc-600 font-mono">
+                      {typeof p.latitude === 'number' && typeof p.longitude === 'number'
+                        ? `${p.latitude.toFixed(3)}, ${p.longitude.toFixed(3)}`
+                        : 'no coords'}
+                    </span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center gap-3 mt-3 pt-3 border-t border-zinc-800">

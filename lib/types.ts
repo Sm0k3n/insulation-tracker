@@ -91,8 +91,9 @@ export interface POJob {
   id: string;
   poNumber: string;
   address: string;
-  latitude: number;
-  longitude: number;
+  /** Optional. POs without coords still work everywhere except the City Map / distance calcs. */
+  latitude?: number;
+  longitude?: number;
   /** 'warehouse' is a stock-holding location (no foreman, not on City Map jobsite list). Defaults to 'jobsite'. */
   type?: 'jobsite' | 'warehouse';
   foremanId?: string;

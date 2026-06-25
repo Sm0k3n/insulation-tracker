@@ -60,12 +60,13 @@ const mainOffice = {
 };
 
 export default function MapComponent({ buckets, referencePO, onSelectItem }: MapComponentProps) {
-  const center: [number, number] = referencePO
-    ? [referencePO.latitude, referencePO.longitude]
+  const refHasCoords = referencePO && typeof referencePO.latitude === 'number' && typeof referencePO.longitude === 'number';
+  const center: [number, number] = refHasCoords
+    ? [referencePO!.latitude as number, referencePO!.longitude as number]
     : [mainOffice.lat, mainOffice.lng];
 
-  const refPoint: [number, number] | null = referencePO
-    ? [referencePO.latitude, referencePO.longitude]
+  const refPoint: [number, number] | null = refHasCoords
+    ? [referencePO!.latitude as number, referencePO!.longitude as number]
     : null;
 
   return (
@@ -91,6 +92,7 @@ export default function MapComponent({ buckets, referencePO, onSelectItem }: Map
       </Marker>
 
       {buckets.map(({ po, items }) => {
+        if (typeof po.latitude !== 'number' || typeof po.longitude !== 'number') return null;
         const isRef = !!referencePO && po.id === referencePO.id;
         return (
           <React.Fragment key={po.id}>

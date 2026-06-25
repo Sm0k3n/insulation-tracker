@@ -73,6 +73,13 @@ export function statusClass(status: InventoryStatus): string {
   return STATUS_TONE[status];
 }
 
+/** Type guard: PO has both coordinates set. */
+export function hasCoords<T extends { latitude?: number; longitude?: number }>(
+  po: T,
+): po is T & { latitude: number; longitude: number } {
+  return typeof po.latitude === 'number' && typeof po.longitude === 'number';
+}
+
 /** Haversine, returns km. */
 export function distanceKm(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }): number {
   const R = 6371;

@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { InventoryItem, MaterialOrder, POJob, User } from '@/lib/types';
-import { itemTitle, itemSubtitle, distanceKm, relativeTime, statusClass, makeTransaction, newId } from '@/lib/util';
+import { itemTitle, itemSubtitle, distanceKm, hasCoords, relativeTime, statusClass, makeTransaction, newId } from '@/lib/util';
 
 const MapComponent = dynamic(() => import('./MapComponent'), { ssr: false });
 
@@ -69,23 +69,23 @@ export default function CityMap({ inventory, pos, currentUser, setInventory, add
   }, [referencePO, destinationPO]);
 
   const availableWithMeta: MapMaterial[] = useMemo(() => {
-    if (!referencePO) return [];
-    return inventory
-      .filter(i => i.status === 'Available for Pickup')
-      .map(i => {
-        const po = pos.find(p => p.poNumber === i.poNumber);
-        if (!po) return null;
-        return {
-          ...i,
-          address: po.address,
-          latitude: po.latitude,
-          longitude: po.longitude,
-          distance: distanceKm(referencePO, po),
-          poJob: po,
-        };
-      })
-      .filter((x): x is MapMaterial => x !== null)
-      .sort((a, b) => a.distance - b.distance);
+    if (!referencePO || !hasCoords(referencePO)) return [];
+    const ref = referencePO;
+    const out: MapMaterial[] = [];
+    for (const i of inventory) {
+      if (i.status !== 'Available for Pickup') continue;
+      const po = pos.find(p => p.poNumber === i.poNumber);
+      if (!po || !hasCoords(po)) continue;
+      out.push({
+        ...i,
+        address: po.address,
+        latitude: po.latitude,
+        longitude: po.longitude,
+        distance: distanceKm(ref, po),
+        poJob: po,
+      });
+    }
+    return out.sort((a, b) => a.distance - b.distance);
   }, [inventory, pos, referencePO]);
 
   const filtered = useMemo(() => {

@@ -416,16 +416,19 @@ function DeliveryCard({
   };
 
   const openDirectionsToDest = () => {
-    const target = destPO
+    const target = destPO && typeof destPO.latitude === 'number' && typeof destPO.longitude === 'number'
       ? `${destPO.latitude},${destPO.longitude}`
-      : encodeURIComponent(order.deliveryAddress || order.poNumber);
+      : encodeURIComponent(destPO?.address || order.deliveryAddress || order.poNumber);
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${target}`, '_blank', 'noopener,noreferrer');
   };
 
   const openDirectionsToSource = () => {
     if (!sourcePOJob) return;
+    const target = typeof sourcePOJob.latitude === 'number' && typeof sourcePOJob.longitude === 'number'
+      ? `${sourcePOJob.latitude},${sourcePOJob.longitude}`
+      : encodeURIComponent(sourcePOJob.address);
     window.open(
-      `https://www.google.com/maps/dir/?api=1&destination=${sourcePOJob.latitude},${sourcePOJob.longitude}`,
+      `https://www.google.com/maps/dir/?api=1&destination=${target}`,
       '_blank', 'noopener,noreferrer',
     );
   };
